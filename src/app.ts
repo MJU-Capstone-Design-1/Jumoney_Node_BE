@@ -1,13 +1,6 @@
 import express, { Request, Response } from 'express';
 import axios from 'axios';
-import dotenv from 'dotenv';
 
-dotenv.config();
-
-const app = express();
-const PORT = 3000;
-
-// 한국투자증권 응답 타입 정의 (필요한 것 위주로)
 interface KISPriceResponse {
   output: {
     stck_prpr: string; // 현재가
@@ -19,24 +12,33 @@ interface KISPriceResponse {
   msg1: string;
 }
 
-let accessToken: string = "";
+const app = express();
+
+let accessToken = '';
 
 /**
  * 1. 접근 토큰 발급 함수
  */
-const getAccessToken = async (): Promise<void> => {
+export const getAccessToken = async (): Promise<void> => {
   try {
     const response = await axios.post(`${process.env.KIS_URL}/oauth2/tokenP`, {
-      grant_type: "client_credentials",
+      grant_type: 'client_credentials',
       appkey: process.env.KIS_APP_KEY,
-      appsecret: process.env.KIS_APP_SECRET
+      appsecret: process.env.KIS_APP_SECRET,
     });
     accessToken = response.data.access_token;
-    console.log("✅ TS 토큰 발급 성공!");
+    console.log('✅ TS 토큰 발급 성공!');
   } catch (error) {
-    console.error("❌ 토큰 발급 실패:", error);
+    console.error('❌ 토큰 발급 실패:', error);
   }
 };
+
+/**
+ * 헬스체크 (Docker HEALTHCHECK / ALB / 모니터링용)
+ */
+app.get('/health', (_req: Request, res: Response) => {
+  res.status(200).json({ status: 'ok', uptime: process.uptime() });
+});
 
 /**
  * 2. 현재가 조회 라우트
@@ -51,37 +53,33 @@ app.get('/price/:code', async (req: Request, res: Response) => {
       `${process.env.KIS_URL}/uapi/domestic-stock/v1/quotations/inquire-price`,
       {
         headers: {
-          "Content-Type": "application/json",
-          "authorization": `Bearer ${accessToken}`,
-          "appkey": process.env.KIS_APP_KEY,
-          "appsecret": process.env.KIS_APP_SECRET,
-          "tr_id": "FHKST01010100" 
+          'Content-Type': 'application/json',
+          authorization: `Bearer ${accessToken}`,
+          appkey: process.env.KIS_APP_KEY,
+          appsecret: process.env.KIS_APP_SECRET,
+          tr_id: 'FHKST01010100',
         },
         params: {
-          "fid_cond_mrkt_div_code": "J",
-          "fid_input_iscd": stockCode
-        }
-      }
+          fid_cond_mrkt_div_code: 'J',
+          fid_input_iscd: stockCode,
+        },
+      },
     );
 
     const { stck_prpr, rprs_mrkt_kor_name, prdy_ctrt } = response.data.output;
-    
+
     res.json({
       name: rprs_mrkt_kor_name,
       price: parseInt(stck_prpr),
-      changeRate: parseFloat(prdy_ctrt)
+      changeRate: parseFloat(prdy_ctrt),
     });
-  } catch (error: any) {
-    res.status(500).json({ 
-      message: "데이터 요청 실패", 
-      error: error.response?.data || error.message 
+  } catch (error: unknown) {
+    const err = error as { response?: { data?: unknown }; message?: string };
+    res.status(500).json({
+      message: '데이터 요청 실패',
+      error: err.response?.data ?? err.message ?? String(error),
     });
   }
-});
-
-app.listen(PORT, () => {
-  console.log(`🚀 TS Server running at http://localhost:${PORT}`);
-  getAccessToken();
 });
 
 export default app;
