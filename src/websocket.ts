@@ -124,7 +124,18 @@ async function recordToRedis(parsedData: Record<string, unknown>) {
   pipeline.set(latestKey, dataString);
   await pipeline.exec();
 
-  await redis.publish(`stock:tick:${code}`, dataString);
+  await redis.xadd(
+    'stream:stock:ticks',
+    'MAXLEN', '~', '50000',
+    '*',
+    'code', code,
+    'price', String(parsedData.price),
+    'change', String(parsedData.change),
+    'rate', String(parsedData.rate),
+    'vol', String(parsedData.vol),
+    'time', String(parsedData.time),
+    'timestamp', String(timestamp),
+  );
   broadcast(code, dataWithTs);
 }
 
