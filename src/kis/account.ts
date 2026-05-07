@@ -15,6 +15,7 @@ export interface KisAccountConfig {
 const SUBSCRIBE_INTERVAL_MS = 50;
 const APPROVAL_RETRY_MS = 30_000;
 const MAX_RECONNECT_MS = 30_000;
+const CLOSE_FLUSH_MS = 500;
 
 /**
  * 단일 KIS 계좌(=approval_key 1개) 단위의 WebSocket 라이프사이클.
@@ -82,11 +83,28 @@ export class KisAccount {
     ws.on('error', (err) => console.error(`${this.logTag} ❌ WS 에러:`, err));
   }
 
-  /** graceful shutdown 시 호출. 이후 reconnect 하지 않음. */
-  close(): void {
+  /**
+   * graceful shutdown.
+   * - 보유 종목들을 tr_type:'2' 로 일괄 해지 후 잠깐 대기하여 KIS 서버에 메시지가 flush 되도록 함.
+   *   (이렇게 해야 다음 기동 시 잔존 구독으로 인한 MAX SUBSCRIBE OVER 가 발생하지 않음)
+   * - 이후 reconnect 하지 않음.
+   */
+  async close(): Promise<void> {
     this.closing = true;
+    const ws = this.ws;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      let unsubSent = 0;
+      for (const code of this.config.assigned) {
+        this.sendUnsubscribe(code);
+        unsubSent += 1;
+      }
+      if (unsubSent > 0) {
+        console.log(`${this.logTag} 🧹 unsubscribe 전송 완료 (${unsubSent}개) - flush 대기`);
+        await new Promise((resolve) => setTimeout(resolve, CLOSE_FLUSH_MS));
+      }
+    }
     try {
-      this.ws?.close();
+      ws?.close();
     } catch {
       /* ignore */
     }
@@ -129,6 +147,14 @@ export class KisAccount {
   }
 
   private sendSubscribe(code: string): void {
+    this.sendRegisterFrame(code, '1');
+  }
+
+  private sendUnsubscribe(code: string): void {
+    this.sendRegisterFrame(code, '2');
+  }
+
+  private sendRegisterFrame(code: string, trType: '1' | '2'): void {
     const ws = this.ws;
     if (!ws || ws.readyState !== WebSocket.OPEN || !this.approvalKey) return;
     ws.send(
@@ -136,7 +162,7 @@ export class KisAccount {
         header: {
           approval_key: this.approvalKey,
           custtype: 'P',
-          tr_type: '1',
+          tr_type: trType,
           'content-type': 'utf-8',
         },
         body: { input: { tr_id: 'H0STCNT0', tr_key: code } },

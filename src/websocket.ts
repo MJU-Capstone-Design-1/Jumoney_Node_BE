@@ -118,6 +118,6 @@ import { startAllAccounts } from './kis/manager';
 
 const kisHandle = startAllAccounts();
 
-export function stopAllKisAccounts(): void {
-  kisHandle.stop();
+export async function stopAllKisAccounts(): Promise<void> {
+  await kisHandle.stop();
 }

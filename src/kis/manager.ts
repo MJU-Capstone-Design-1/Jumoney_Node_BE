@@ -51,7 +51,7 @@ export function shardRoundRobin(codes: readonly string[], n: number): string[][]
  */
 export function startAllAccounts(
   symbols: readonly string[] = KOSPI_200_CODES,
-): { stop: () => void; accounts: KisAccount[] } {
+): { stop: () => Promise<void>; accounts: KisAccount[] } {
   assertKospi200Codes(symbols);
 
   const creds = loadCredentialsFromEnv();
@@ -59,7 +59,7 @@ export function startAllAccounts(
     console.error(
       '❌ KIS_APP_KEY{N}/KIS_APP_SECRET{N} 가 .env 에 하나도 설정되어 있지 않습니다. 웹소켓 기동을 건너뜁니다.',
     );
-    return { stop: () => undefined, accounts: [] };
+    return { stop: async () => undefined, accounts: [] };
   }
 
   const buckets = shardRoundRobin(symbols, creds.length);
@@ -83,8 +83,8 @@ export function startAllAccounts(
     setTimeout(() => void acc.start(), i * ACCOUNT_START_STAGGER_MS);
   });
 
-  const stop = (): void => {
-    for (const acc of accounts) acc.close();
+  const stop = async (): Promise<void> => {
+    await Promise.all(accounts.map((acc) => acc.close()));
   };
 
   return { stop, accounts };
