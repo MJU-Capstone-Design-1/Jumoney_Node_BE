@@ -2,21 +2,89 @@ import WebSocket from 'ws';
 import Redis from 'ioredis';
 import axios from 'axios';
 import dotenv from 'dotenv';
+import type { Response } from 'express';
 
 dotenv.config();
 
-const redis = new Redis({
-  host: process.env.REDIS_HOST ?? '13.209.125.199',
-  port: Number(process.env.REDIS_PORT ?? 6379),
-  ...(process.env.REDIS_PASSWORD ? { password: process.env.REDIS_PASSWORD } : { password: 'mju_redis' }),
+const { REDIS_HOST, REDIS_PORT, REDIS_PASSWORD } = process.env;
+if (!REDIS_HOST || !REDIS_PORT || !REDIS_PASSWORD) {
+  throw new Error(
+    'REDIS_HOST, REDIS_PORT, REDIS_PASSWORD 환경변수가 모두 필요합니다. .env 파일을 확인하세요.',
+  );
+}
+
+export const redis = new Redis({
+  host: REDIS_HOST,
+  port: Number(REDIS_PORT),
+  password: REDIS_PASSWORD,
 });
 
-/** 모의 31000 / 실전 21000 — 필요 시 env로 덮어쓰기 */
-const KIS_WS_URL =
-  process.env.KIS_WS_URL ??
-  'ws://ops.koreainvestment.com:31000';
+redis.on('error', (err) => console.error('❌ Redis 연결 에러:', err));
 
-const TARGET_STOCKS = ['005930', '000660'];
+/** 모의 31000 / 실전 21000 — 필요 시 env로 덮어쓰기 */
+const KIS_WS_URL = process.env.KIS_WS_URL ?? 'ws://ops.koreainvestment.com:31000';
+
+// 종목코드 → 연결된 SSE 클라이언트
+export const sseClients = new Map<string, Set<Response>>();
+
+export function broadcast(code: string, data: unknown) {
+  const clients = sseClients.get(code);
+  if (!clients?.size) return;
+  const payload = `data: ${JSON.stringify(data)}\n\n`;
+  for (const res of clients) res.write(payload);
+}
+
+let ws: WebSocket | null = null;
+let approvalKey: string | null = null;
+let reconnectDelay = 1000;
+
+// SSE 클라이언트 기준으로 구독해야 할 종목 목록
+const subscribedStocks = new Set<string>();
+
+function sendSubscribe(code: string) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(
+    JSON.stringify({
+      header: {
+        approval_key: approvalKey,
+        custtype: 'P',
+        tr_type: '1',
+        'content-type': 'utf-8',
+      },
+      body: { input: { tr_id: 'H0STCNT0', tr_key: code } },
+    }),
+  );
+}
+
+function sendUnsubscribe(code: string) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(
+    JSON.stringify({
+      header: {
+        approval_key: approvalKey,
+        custtype: 'P',
+        tr_type: '2',
+        'content-type': 'utf-8',
+      },
+      body: { input: { tr_id: 'H0STCNT0', tr_key: code } },
+    }),
+  );
+}
+
+export function onClientConnect(code: string) {
+  if (!subscribedStocks.has(code)) {
+    subscribedStocks.add(code);
+    sendSubscribe(code);
+  }
+}
+
+export function onClientDisconnect(code: string) {
+  const clients = sseClients.get(code);
+  if (!clients?.size) {
+    subscribedStocks.delete(code);
+    sendUnsubscribe(code);
+  }
+}
 
 async function getApprovalKey(): Promise<string | null> {
   const base = process.env.KIS_URL;
@@ -45,13 +113,30 @@ async function recordToRedis(parsedData: Record<string, unknown>) {
   const latestKey = `stock:latest:${code}`;
 
   const timestamp = Date.now();
-  const dataString = JSON.stringify({ ...parsedData, timestamp });
+  const dataWithTs = { ...parsedData, timestamp };
+  const dataString = JSON.stringify(dataWithTs);
+
+  const thirtyMinutesAgo = timestamp - 30 * 60 * 1000;
 
   const pipeline = redis.multi();
   pipeline.zadd(historyKey, timestamp, dataString);
-  pipeline.zremrangebyrank(historyKey, 0, -101);
+  pipeline.zremrangebyscore(historyKey, 0, thirtyMinutesAgo);
   pipeline.set(latestKey, dataString);
   await pipeline.exec();
+
+  await redis.xadd(
+    'stream:stock:ticks',
+    'MAXLEN', '~', '50000',
+    '*',
+    'code', code,
+    'price', String(parsedData.price),
+    'change', String(parsedData.change),
+    'rate', String(parsedData.rate),
+    'vol', String(parsedData.vol),
+    'time', String(parsedData.time),
+    'timestamp', String(timestamp),
+  );
+  broadcast(code, dataWithTs);
 }
 
 function parseKisTick(msg: string): Record<string, unknown> | null {
@@ -61,45 +146,38 @@ function parseKisTick(msg: string): Record<string, unknown> | null {
   const body = parts[3].split('^');
   if (body.length < 13) return null;
 
+  const price = parseInt(body[2], 10);
+  const change = parseInt(body[4], 10);
+  const rate = parseFloat(body[5]);
+  const vol = parseInt(body[12], 10);
+
+  if (isNaN(price) || isNaN(change) || isNaN(rate) || isNaN(vol)) return null;
+
   return {
     code: body[0],
     time: body[1],
-    price: parseInt(body[2], 10),
-    change: parseInt(body[4], 10),
-    rate: parseFloat(body[5]),
-    vol: parseInt(body[12], 10),
+    price,
+    change,
+    rate,
+    vol,
   };
 }
 
 async function startWebSocket() {
-  const approvalKey = await getApprovalKey();
-  if (!approvalKey) return;
+  approvalKey = await getApprovalKey();
+  if (!approvalKey) {
+    console.error('❌ approval_key 발급 실패, 30초 후 재시도');
+    setTimeout(() => void startWebSocket(), 30_000);
+    return;
+  }
 
   console.log('✅ 웹소켓 approval_key 발급 성공');
-
-  const ws = new WebSocket(KIS_WS_URL);
+  ws = new WebSocket(KIS_WS_URL);
 
   ws.on('open', () => {
     console.log('✅ KIS 웹소켓 접속 성공');
-
-    for (const code of TARGET_STOCKS) {
-      ws.send(
-        JSON.stringify({
-          header: {
-            approval_key: approvalKey,
-            custtype: 'P',
-            tr_type: '1',
-            'content-type': 'utf-8',
-          },
-          body: {
-            input: {
-              tr_id: 'H0STCNT0',
-              tr_key: code,
-            },
-          },
-        }),
-      );
-    }
+    reconnectDelay = 1000;
+    for (const code of subscribedStocks) sendSubscribe(code);
   });
 
   ws.on('message', (raw: WebSocket.RawData) => {
@@ -128,7 +206,13 @@ async function startWebSocket() {
     })();
   });
 
-  ws.on('close', () => console.log('⚠️ 웹소켓 연결 종료'));
+  ws.on('close', () => {
+    ws = null;
+    console.log(`⚠️ 웹소켓 연결 종료, ${reconnectDelay / 1000}초 후 재연결`);
+    setTimeout(() => void startWebSocket(), reconnectDelay);
+    reconnectDelay = Math.min(reconnectDelay * 2, 30_000);
+  });
+
   ws.on('error', (err) => console.error('❌ WS 에러:', err));
 }
 

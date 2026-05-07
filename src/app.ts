@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
 import axios from 'axios';
+import { redis, sseClients, onClientConnect, onClientDisconnect } from './websocket';
 
 interface KISPriceResponse {
   output: {
@@ -38,6 +39,30 @@ export const getAccessToken = async (): Promise<void> => {
  */
 app.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({ status: 'ok', uptime: process.uptime() });
+});
+
+/**
+ * 실시간 주식 데이터 SSE 스트림
+ */
+app.get('/stream/:code', async (req: Request, res: Response) => {
+  const code = req.params.code as string;
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+
+  // 캐시된 최신값 즉시 전송 (장 외 시간 또는 첫 접속 시 초기값 제공)
+  const cached = await redis.get(`stock:latest:${code}`);
+  if (cached) res.write(`data: ${cached}\n\n`);
+
+  if (!sseClients.has(code)) sseClients.set(code, new Set());
+  sseClients.get(code)!.add(res);
+  onClientConnect(code);
+
+  req.on('close', () => {
+    sseClients.get(code)?.delete(res);
+    onClientDisconnect(code);
+  });
 });
 
 /**
