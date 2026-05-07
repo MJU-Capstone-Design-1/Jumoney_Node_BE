@@ -41,22 +41,24 @@ export function parseKisTick(msg: string): Record<string, unknown> | null {
   const parts = msg.split('|');
   if (parts.length < 4 || !parts[3]) return null;
   const body = parts[3].split('^');
-  if (body.length < 13) return null;
+  if (body.length < 18) return null;
 
   const price = parseInt(body[2], 10);
   const change = parseInt(body[4], 10);
   const rate = parseFloat(body[5]);
   const vol = parseInt(body[12], 10);
+  const strength = parseFloat(body[17]);
 
-  if (isNaN(price) || isNaN(change) || isNaN(rate) || isNaN(vol)) return null;
+  if (isNaN(price) || isNaN(change) || isNaN(rate) || isNaN(vol) || isNaN(strength)) return null;
 
   return {
-    code: body[0],
-    time: body[1],
-    price,
-    change,
-    rate,
-    vol,
+    code: body[0],  // 종목코드
+    time: body[1],  // 시간
+    price,  // 현재가
+    change,  // 전일대비
+    rate,  // 등락률
+    vol,  // 누적거래량
+    strength,  // 체결강도 (CTTR)
   };
 }
 
@@ -100,6 +102,8 @@ export async function recordToRedis(parsedData: Record<string, unknown>): Promis
     String(parsedData.rate),
     'vol',
     String(parsedData.vol),
+    'strength',
+    String(parsedData.strength),
     'time',
     String(parsedData.time),
     'timestamp',

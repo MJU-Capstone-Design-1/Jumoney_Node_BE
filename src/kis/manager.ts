@@ -1,8 +1,8 @@
 import { KisAccount, type KisAccountConfig } from './account';
-import { KOSPI_200_CODES, assertKospi200Length } from './symbols';
+import { KOSPI_200_CODES, assertKospi200Codes } from './symbols';
 
-const MAX_ACCOUNTS = 5;
-const ACCOUNT_START_STAGGER_MS = 200;
+const MAX_ACCOUNTS = 7;
+const ACCOUNT_START_STAGGER_MS = 1200;
 
 interface KisCredential {
   index: number;
@@ -11,7 +11,7 @@ interface KisCredential {
 }
 
 /**
- * .env 의 KIS_APP_KEY{1..5} / KIS_APP_SECRET{1..5} 페어를 모두 읽어
+ * .env 의 KIS_APP_KEY{1..7} / KIS_APP_SECRET{1..7} 페어를 모두 읽어
  * 채워져 있는 계좌만 반환. 둘 중 하나만 있는 경우는 무시(경고 로그).
  */
 export function loadCredentialsFromEnv(): KisCredential[] {
@@ -52,7 +52,7 @@ export function shardRoundRobin(codes: readonly string[], n: number): string[][]
 export function startAllAccounts(
   symbols: readonly string[] = KOSPI_200_CODES,
 ): { stop: () => void; accounts: KisAccount[] } {
-  assertKospi200Length(symbols);
+  assertKospi200Codes(symbols);
 
   const creds = loadCredentialsFromEnv();
   if (creds.length === 0) {
