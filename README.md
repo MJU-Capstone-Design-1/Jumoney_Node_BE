@@ -28,11 +28,24 @@ docker-compose.yml
 
 ## 로컬 개발
 
+EC2 운영 Redis와 분리된 **로컬 Redis 컨테이너**에 붙어 작업합니다. (`docker-compose.override.yml`이 6379 포트를 호스트로 노출)
+
 ```bash
 pnpm install
-cp .env.example .env   # 값 채우기
-pnpm dev               # tsx watch
+cp .env.example .env
+# .env 에서 REDIS_HOST=127.0.0.1, REDIS_PASSWORD=원하는값 으로 수정
+
+# 로컬 Redis 컨테이너만 띄우기
+docker compose up -d redis
+
+# 헬스체크 (PONG 응답 확인)
+redis-cli -h 127.0.0.1 -a "$REDIS_PASSWORD" ping
+
+# 호스트에서 앱 실행 (tsx watch)
+pnpm dev
 ```
+
+> `REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` 중 하나라도 비어있으면 앱이 명시적 에러로 즉시 종료됩니다. (운영 Redis 자동 fallback 방지)
 
 ## 빌드 / 타입체크
 

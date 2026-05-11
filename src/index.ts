@@ -4,16 +4,19 @@ dotenv.config();
 
 import './websocket';
 import app, { getAccessToken } from './app';
+import { startNewsPipeline, stopNewsPipeline } from './news';
 
 const port = Number(process.env.PORT ?? 3000);
 
 const server = app.listen(port, () => {
   console.log(`🚀 Server is running at http://localhost:${port}`);
   void getAccessToken();
+  startNewsPipeline();
 });
 
 const shutdown = (signal: string) => {
   console.log(`\n${signal} 수신, graceful shutdown 시작...`);
+  stopNewsPipeline();
   server.close((err) => {
     if (err) {
       console.error('❌ 서버 종료 중 에러:', err);
