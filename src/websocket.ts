@@ -90,7 +90,7 @@ export async function recordToRedis(parsedData: Record<string, unknown>): Promis
     'stream:stock:ticks',
     'MAXLEN',
     '~',
-    '50000',
+    '300000',
     '*',
     'code',
     code,
