@@ -5,7 +5,7 @@ set -euo pipefail
 # - 현재 활성 색을 Nginx active include 파일에서 감지
 # - 반대 색을 빌드/기동 → /health 확인 → Nginx upstream 스위치 → 구 색 정지
 
-ACTIVE_FILE="${ACTIVE_FILE:-/etc/nginx/conf.d/jumoney-active.conf}"
+ACTIVE_FILE="${ACTIVE_FILE:-/etc/nginx/snippets/jumoney-active.conf}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yml}"
 COMPOSE=(docker compose -f "$COMPOSE_FILE")
 
