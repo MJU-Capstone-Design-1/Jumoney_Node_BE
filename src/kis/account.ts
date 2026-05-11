@@ -1,7 +1,7 @@
-import WebSocket from 'ws';
-import axios from 'axios';
+import WebSocket from "ws";
+import axios from "axios";
 
-import { parseKisTick, recordToRedis } from '../websocket';
+import { parseKisTick, recordToRedis } from "../websocket";
 
 export interface KisAccountConfig {
   /** 0-based 계좌 인덱스 (.env 의 KIS_APP_KEY{N} 의 N-1) */
@@ -49,28 +49,28 @@ export class KisAccount {
       return;
     }
 
-    const preview = this.config.assigned.slice(0, 5).join(',');
-    const tail = this.config.assigned.length > 5 ? '...' : '';
+    const preview = this.config.assigned.slice(0, 5).join(",");
+    const tail = this.config.assigned.length > 5 ? "..." : "";
     console.log(
       `${this.logTag} ✅ approval_key 발급 성공 (할당 ${this.config.assigned.length}개: ${preview}${tail})`,
     );
 
-    const url = process.env.KIS_WS_URL ?? 'ws://ops.koreainvestment.com:31000';
+    const url = process.env.KIS_WS_URL ?? "ws://ops.koreainvestment.com:31000";
     const ws = new WebSocket(url);
     this.ws = ws;
 
-    ws.on('open', () => {
+    ws.on("open", () => {
       console.log(`${this.logTag} ✅ KIS 웹소켓 접속 성공`);
       this.reconnectDelay = 1000;
       void this.subscribeAll();
     });
 
-    ws.on('message', (raw: WebSocket.RawData) => {
-      const msg = typeof raw === 'string' ? raw : raw.toString('utf8');
+    ws.on("message", (raw: WebSocket.RawData) => {
+      const msg = typeof raw === "string" ? raw : raw.toString("utf8");
       void this.handleMessage(msg);
     });
 
-    ws.on('close', () => {
+    ws.on("close", () => {
       this.ws = null;
       if (this.closing) return;
       console.log(
@@ -80,7 +80,7 @@ export class KisAccount {
       this.reconnectDelay = Math.min(this.reconnectDelay * 2, MAX_RECONNECT_MS);
     });
 
-    ws.on('error', (err) => console.error(`${this.logTag} ❌ WS 에러:`, err));
+    ws.on("error", (err) => console.error(`${this.logTag} ❌ WS 에러:`, err));
   }
 
   /**
@@ -99,7 +99,9 @@ export class KisAccount {
         unsubSent += 1;
       }
       if (unsubSent > 0) {
-        console.log(`${this.logTag} 🧹 unsubscribe 전송 완료 (${unsubSent}개) - flush 대기`);
+        console.log(
+          `${this.logTag} 🧹 unsubscribe 전송 완료 (${unsubSent}개) - flush 대기`,
+        );
         await new Promise((resolve) => setTimeout(resolve, CLOSE_FLUSH_MS));
       }
     }
@@ -114,12 +116,14 @@ export class KisAccount {
   private async fetchApprovalKey(): Promise<string | null> {
     const base = process.env.KIS_URL;
     if (!base) {
-      console.error(`${this.logTag} ❌ KIS_URL 환경변수가 설정되지 않았습니다.`);
+      console.error(
+        `${this.logTag} ❌ KIS_URL 환경변수가 설정되지 않았습니다.`,
+      );
       return null;
     }
     try {
       const { data } = await axios.post(`${base}/oauth2/Approval`, {
-        grant_type: 'client_credentials',
+        grant_type: "client_credentials",
         appkey: this.config.appKey,
         secretkey: this.config.appSecret,
       });
@@ -141,31 +145,35 @@ export class KisAccount {
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) break;
       this.sendSubscribe(code);
       sent += 1;
-      await new Promise((resolve) => setTimeout(resolve, SUBSCRIBE_INTERVAL_MS));
+      await new Promise((resolve) =>
+        setTimeout(resolve, SUBSCRIBE_INTERVAL_MS),
+      );
     }
-    console.log(`${this.logTag} ✅ subscribe 전송 완료 (${sent}/${this.config.assigned.length})`);
+    console.log(
+      `${this.logTag} ✅ subscribe 전송 완료 (${sent}/${this.config.assigned.length})`,
+    );
   }
 
   private sendSubscribe(code: string): void {
-    this.sendRegisterFrame(code, '1');
+    this.sendRegisterFrame(code, "1");
   }
 
   private sendUnsubscribe(code: string): void {
-    this.sendRegisterFrame(code, '2');
+    this.sendRegisterFrame(code, "2");
   }
 
-  private sendRegisterFrame(code: string, trType: '1' | '2'): void {
+  private sendRegisterFrame(code: string, trType: "1" | "2"): void {
     const ws = this.ws;
     if (!ws || ws.readyState !== WebSocket.OPEN || !this.approvalKey) return;
     ws.send(
       JSON.stringify({
         header: {
           approval_key: this.approvalKey,
-          custtype: 'P',
+          custtype: "P",
           tr_type: trType,
-          'content-type': 'utf-8',
+          "content-type": "utf-8",
         },
-        body: { input: { tr_id: 'H0STCNT0', tr_key: code } },
+        body: { input: { tr_id: "H0STCNT0", tr_key: code } },
       }),
     );
   }
@@ -173,13 +181,13 @@ export class KisAccount {
   private async handleMessage(msg: string): Promise<void> {
     const parsed = parseKisTick(msg);
     if (!parsed) {
-      if (!msg.startsWith('0') && !msg.startsWith('1')) {
+      if (!msg.startsWith("0") && !msg.startsWith("1")) {
         try {
           const o = JSON.parse(msg) as {
             header?: { tr_id?: string };
             body?: { msg1?: string };
           };
-          if (o.header?.tr_id !== 'PINGPONG') {
+          if (o.header?.tr_id !== "PINGPONG") {
             console.log(`${this.logTag} ℹ️ 시스템:`, o.body?.msg1 ?? msg);
           }
         } catch {

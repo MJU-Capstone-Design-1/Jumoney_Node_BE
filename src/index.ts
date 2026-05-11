@@ -1,10 +1,10 @@
-import dotenv from 'dotenv';
+import dotenv from "dotenv";
 
 dotenv.config();
 
-import './websocket';
-import app, { getAccessToken } from './app';
-import { startNewsPipeline, stopNewsPipeline } from './news';
+import "./websocket";
+import app, { getAccessToken } from "./app";
+import { startNewsPipeline, stopNewsPipeline } from "./news";
 
 const port = Number(process.env.PORT ?? 3000);
 
@@ -19,17 +19,17 @@ const shutdown = (signal: string) => {
   stopNewsPipeline();
   server.close((err) => {
     if (err) {
-      console.error('❌ 서버 종료 중 에러:', err);
+      console.error("❌ 서버 종료 중 에러:", err);
       process.exit(1);
     }
-    console.log('✅ 서버 종료 완료');
+    console.log("✅ 서버 종료 완료");
     process.exit(0);
   });
   setTimeout(() => {
-    console.warn('⚠️ 강제 종료 (timeout)');
+    console.warn("⚠️ 강제 종료 (timeout)");
     process.exit(1);
   }, 10_000).unref();
 };
 
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));

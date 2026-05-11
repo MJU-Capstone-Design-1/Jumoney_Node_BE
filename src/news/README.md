@@ -10,14 +10,14 @@
 
 ## Redis 키 컨트랙트
 
-| Key | Type | 필드 / 의미 |
-|---|---|---|
-| `news:seq` | STRING (INCR) | 단조 newsId 시퀀스 (영구) |
-| `news:item:{newsId}` | HASH | `newsId`, `newUrl`, `title`, `content`, `publishedAt(ms)`, `keyword`, `fetchedAt(ms)` |
-| `news:today` | ZSET | member=newsId(str), score=publishedAt(ms) |
-| `news:dedup:{YYYYMMDD}` | SET | canonical URL SHA-1 |
-| `news:analysis:today` | HASH | `baseTime(ISO)`, `analysisResult`, `summary`, `reasoning`, `keyword`, `newsCount`, `newsIds(JSON)`, `goodSectors(JSON)`, `badSectors(JSON)` |
-| `stream:news:analysis` | STREAM (MAXLEN ~1000) | `baseTime`, `newsCount`, `keyword` |
+| Key                     | Type                  | 필드 / 의미                                                                                                                                 |
+| ----------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `news:seq`              | STRING (INCR)         | 단조 newsId 시퀀스 (영구)                                                                                                                   |
+| `news:item:{newsId}`    | HASH                  | `newsId`, `newUrl`, `title`, `content`, `publishedAt(ms)`, `keyword`, `fetchedAt(ms)`                                                       |
+| `news:today`            | ZSET                  | member=newsId(str), score=publishedAt(ms)                                                                                                   |
+| `news:dedup:{YYYYMMDD}` | SET                   | canonical URL SHA-1                                                                                                                         |
+| `news:analysis:today`   | HASH                  | `baseTime(ISO)`, `analysisResult`, `summary`, `reasoning`, `keyword`, `newsCount`, `newsIds(JSON)`, `goodSectors(JSON)`, `badSectors(JSON)` |
+| `stream:news:analysis`  | STREAM (MAXLEN ~1000) | `baseTime`, `newsCount`, `keyword`                                                                                                          |
 
 ## Spring 소비 절차
 

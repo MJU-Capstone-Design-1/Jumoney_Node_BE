@@ -22,6 +22,6 @@ jobs:
             set -euo pipefail
             cd "${{ secrets.EC2_APP_DIR }}"
             git fetch --all --prune
-            git reset --hard origin/develop
+            git reset --hard origin/main
             chmod +x scripts/deploy.sh
             bash scripts/deploy.sh

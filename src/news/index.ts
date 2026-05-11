@@ -1,5 +1,5 @@
-import { NaverClient, canonicalizeUrl, stripHtml } from './naver';
-import { GeminiClient } from './gemini';
+import { NaverClient, canonicalizeUrl, stripHtml } from "./naver";
+import { GeminiClient } from "./gemini";
 import {
   tryAddDedup,
   nextNewsId,
@@ -9,9 +9,14 @@ import {
   storeAnalysis,
   publishAnalysisEvent,
   resetDailyKeys,
-} from './redis';
-import { registerHourlyJob, registerFinalJob, registerResetJob, stopAll } from './scheduler';
-import type { NewsItem, NewsAnalysisResult } from './types';
+} from "./redis";
+import {
+  registerHourlyJob,
+  registerFinalJob,
+  registerResetJob,
+  stopAll,
+} from "./scheduler";
+import type { NewsItem, NewsAnalysisResult } from "./types";
 
 let naver: NaverClient | null = null;
 let gemini: GeminiClient | null = null;
@@ -23,8 +28,8 @@ function getClients(): { naver: NaverClient; gemini: GeminiClient } {
 }
 
 function parseKeywords(): string[] {
-  return (process.env.NEWS_KEYWORDS ?? '경제,금융,주식,증시,코스피,투자')
-    .split(',')
+  return (process.env.NEWS_KEYWORDS ?? "경제,금융,주식,증시,코스피,투자")
+    .split(",")
     .map((k) => k.trim())
     .filter(Boolean);
 }
@@ -84,7 +89,7 @@ async function maybeAnalyze(_force = false): Promise<boolean> {
   try {
     analysis = await gemini.analyze(items);
   } catch (e) {
-    console.error('[news] gemini analyze failed:', e);
+    console.error("[news] gemini analyze failed:", e);
     return false;
   }
 
@@ -96,7 +101,9 @@ async function maybeAnalyze(_force = false): Promise<boolean> {
   };
   await storeAnalysis(result);
   await publishAnalysisEvent(result);
-  console.log(`[news] analysis stored & event published (newsCount=${items.length})`);
+  console.log(
+    `[news] analysis stored & event published (newsCount=${items.length})`,
+  );
   return true;
 }
 
@@ -120,17 +127,21 @@ export function startNewsPipeline(): void {
   });
   registerResetJob(async () => {
     await resetDailyKeys();
-    console.log('[news:reset] today keys cleared');
+    console.log("[news:reset] today keys cleared");
   });
-  console.log('[news] pipeline scheduled (hourly :05, final 23:59, reset 00:00 KST)');
+  console.log(
+    "[news] pipeline scheduled (hourly :05, final 23:59, reset 00:00 KST)",
+  );
 
   void (async () => {
     try {
-      console.log('[news:bootstrap] initial collection start');
+      console.log("[news:bootstrap] initial collection start");
       const { inserted, analyzed } = await triggerNewsPipelineOnce(false);
-      console.log(`[news:bootstrap] inserted=${inserted}, analyzed=${analyzed}`);
+      console.log(
+        `[news:bootstrap] inserted=${inserted}, analyzed=${analyzed}`,
+      );
     } catch (e) {
-      console.error('[news:bootstrap] failed:', e);
+      console.error("[news:bootstrap] failed:", e);
     }
   })();
 }

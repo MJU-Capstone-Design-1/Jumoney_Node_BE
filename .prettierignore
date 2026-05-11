@@ -1,0 +1,8 @@
+# 자동 생성/외부 파일
+pnpm-lock.yaml
+node_modules
+dist
+coverage
+
+# 이모지 파일명 — GitHub UI 전용
+.github/ISSUE_TEMPLATE/
