@@ -6,4 +6,3 @@ dist
 coverage
 ./kis_api
 docker-compose.override.yml
-.github/
