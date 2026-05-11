@@ -34,14 +34,18 @@
 5) XACK stream:news:analysis spring-news-consumer <messageId>
 ```
 
+> ⚠️ 재분석: 매시 :05마다 `news:analysis:today` 가 덮어쓰이며 Stream 이벤트가 추가 발행됩니다. Spring은 `baseTime` 의 일자(YYYYMMDD) 기준으로 `NewsAnalysis` 를 UPSERT 권장. 매핑 테이블도 같은 일자분 삭제 후 재삽입.
+>
+> ⚠️ 자정 리셋: 00:00 KST cron 으로 `news:today`, `news:analysis:today`, `news:dedup:{어제}` 가 DEL 됩니다.
+
 ## 환경변수
 
 ```
 NAVER_CLIENT_ID=
 NAVER_CLIENT_SECRET=
 GEMINI_API_KEY=
-GEMINI_MODEL=gemini-2.0-flash
-NEWS_KEYWORDS=경제,금융,주식
+GEMINI_MODEL=gemini-2.5-pro
+NEWS_KEYWORDS=경제,금융,주식,증시,코스피,투자
 NEWS_PER_RUN=30
 NEWS_DISPLAY_PER_KEYWORD=10
 ```

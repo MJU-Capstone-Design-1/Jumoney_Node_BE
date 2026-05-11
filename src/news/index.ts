@@ -5,12 +5,12 @@ import {
   nextNewsId,
   storeNewsItem,
   getTodayCount,
-  hasAnalysisToday,
   getTodayNewsItems,
   storeAnalysis,
   publishAnalysisEvent,
+  resetDailyKeys,
 } from './redis';
-import { registerHourlyJob, registerFinalJob, stopAll } from './scheduler';
+import { registerHourlyJob, registerFinalJob, registerResetJob, stopAll } from './scheduler';
 import type { NewsItem, NewsAnalysisResult } from './types';
 
 let naver: NaverClient | null = null;
@@ -23,7 +23,7 @@ function getClients(): { naver: NaverClient; gemini: GeminiClient } {
 }
 
 function parseKeywords(): string[] {
-  return (process.env.NEWS_KEYWORDS ?? '경제,금융,주식')
+  return (process.env.NEWS_KEYWORDS ?? '경제,금융,주식,증시,코스피,투자')
     .split(',')
     .map((k) => k.trim())
     .filter(Boolean);
@@ -72,11 +72,9 @@ async function collectOnce(): Promise<number> {
   return inserted;
 }
 
-async function maybeAnalyze(force = false): Promise<boolean> {
+async function maybeAnalyze(_force = false): Promise<boolean> {
   const target = Number(process.env.NEWS_PER_RUN ?? 30);
   const count = await getTodayCount();
-  if (!force && count < target) return false;
-  if (await hasAnalysisToday()) return false;
   if (count === 0) return false;
 
   const { gemini } = getClients();
@@ -120,7 +118,11 @@ export function startNewsPipeline(): void {
     await collectOnce();
     await maybeAnalyze(true);
   });
-  console.log('[news] pipeline scheduled (hourly :05, final 23:59 KST)');
+  registerResetJob(async () => {
+    await resetDailyKeys();
+    console.log('[news:reset] today keys cleared');
+  });
+  console.log('[news] pipeline scheduled (hourly :05, final 23:59, reset 00:00 KST)');
 
   void (async () => {
     try {

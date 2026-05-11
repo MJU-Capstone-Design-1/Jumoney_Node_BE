@@ -15,6 +15,12 @@ export function registerFinalJob(handler: () => Promise<void>): void {
   );
 }
 
+export function registerResetJob(handler: () => Promise<void>): void {
+  tasks.push(
+    cron.schedule('0 0 * * *', () => void runSafe('reset-00:00', handler), { timezone: TZ }),
+  );
+}
+
 export function stopAll(): void {
   for (const t of tasks) t.stop();
   tasks.length = 0;

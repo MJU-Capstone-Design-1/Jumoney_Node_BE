@@ -38,6 +38,14 @@ export function dedupKey(ymd: string = todayKstYmd()): string {
   return `news:dedup:${ymd}`;
 }
 
+export function yesterdayKstYmd(now = new Date()): string {
+  return todayKstYmd(new Date(now.getTime() - 24 * 60 * 60 * 1000));
+}
+
+export async function resetDailyKeys(): Promise<void> {
+  await redis.del(KEY_TODAY, KEY_ANALYSIS_TODAY, dedupKey(yesterdayKstYmd()));
+}
+
 export function itemKey(newsId: number): string {
   return `news:item:${newsId}`;
 }
