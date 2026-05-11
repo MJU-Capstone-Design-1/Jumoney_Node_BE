@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import axios from 'axios';
 import { redis, sseClients } from './websocket';
+import { triggerNewsPipelineOnce } from './news';
 
 interface KISPriceResponse {
   output: {
@@ -114,6 +115,20 @@ app.get('/price/:code', async (req: Request, res: Response) => {
       message: '데이터 요청 실패',
       error: err.response?.data ?? err.message ?? String(error),
     });
+  }
+});
+
+app.post('/admin/news/run', async (req: Request, res: Response) => {
+  if (process.env.NODE_ENV === 'production' && req.headers['x-admin-token'] !== process.env.ADMIN_TOKEN) {
+    return res.status(403).json({ message: 'forbidden' });
+  }
+  try {
+    const force = req.query.force === '1' || req.query.force === 'true';
+    const result = await triggerNewsPipelineOnce(force);
+    return res.json(result);
+  } catch (e) {
+    const err = e as Error;
+    return res.status(500).json({ message: 'news pipeline failed', error: err.message });
   }
 });
 
