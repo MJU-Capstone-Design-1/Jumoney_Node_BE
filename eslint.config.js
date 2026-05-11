@@ -1,27 +1,27 @@
-const js = require('@eslint/js');
-const globals = require('globals');
-const tseslint = require('typescript-eslint');
+const js = require("@eslint/js");
+const globals = require("globals");
+const tseslint = require("typescript-eslint");
 
 module.exports = tseslint.config(
   {
-    ignores: ['dist', 'coverage', 'node_modules'],
+    ignores: ["dist", "coverage", "node_modules"],
   },
   {
-    files: ['**/*.ts'],
+    files: ["**/*.ts"],
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     languageOptions: {
       ecmaVersion: 2022,
-      sourceType: 'module',
+      sourceType: "module",
       globals: globals.node,
     },
     rules: {
-      '@typescript-eslint/no-unused-vars': [
-        'error',
+      "@typescript-eslint/no-unused-vars": [
+        "error",
         {
-          argsIgnorePattern: '^_',
-          varsIgnorePattern: '^_',
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
         },
       ],
     },
-  }
+  },
 );

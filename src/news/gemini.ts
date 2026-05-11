@@ -1,5 +1,5 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import type { NewsItem, NewsAnalysisResult } from './types';
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import type { NewsItem, NewsAnalysisResult } from "./types";
 
 const SYSTEM_PROMPT = `당신은 한국 주식시장 전문 애널리스트입니다.
 입력된 뉴스 목록을 분석하여 한국 증시 섹터에 미칠 영향을 평가하세요.
@@ -22,15 +22,18 @@ export class GeminiClient {
 
   constructor() {
     const { GEMINI_API_KEY, GEMINI_MODEL } = process.env;
-    if (!GEMINI_API_KEY) throw new Error('GEMINI_API_KEY 환경변수가 필요합니다.');
+    if (!GEMINI_API_KEY)
+      throw new Error("GEMINI_API_KEY 환경변수가 필요합니다.");
     this.client = new GoogleGenerativeAI(GEMINI_API_KEY);
-    this.modelName = GEMINI_MODEL ?? 'gemini-2.5-pro';
+    this.modelName = GEMINI_MODEL ?? "gemini-2.5-pro";
   }
 
-  async analyze(items: NewsItem[]): Promise<Omit<NewsAnalysisResult, 'baseTime' | 'newsCount' | 'newsIds'>> {
+  async analyze(
+    items: NewsItem[],
+  ): Promise<Omit<NewsAnalysisResult, "baseTime" | "newsCount" | "newsIds">> {
     const model = this.client.getGenerativeModel({
       model: this.modelName,
-      generationConfig: { responseMimeType: 'application/json' },
+      generationConfig: { responseMimeType: "application/json" },
     });
 
     const newsBlock = items
@@ -38,7 +41,7 @@ export class GeminiClient {
         (n, i) =>
           `[${i + 1}] (${new Date(n.publishedAt).toISOString()}) ${n.title}\n${n.content}`,
       )
-      .join('\n\n');
+      .join("\n\n");
 
     const prompt = `${SYSTEM_PROMPT}\n\n=== 분석 대상 뉴스 (${items.length}개) ===\n${newsBlock}`;
 
@@ -58,7 +61,7 @@ export class GeminiClient {
       analysisResult: parsed.analysisResult,
       summary: parsed.summary,
       reasoning: parsed.reasoning,
-      keyword: (parsed.keyword ?? '').slice(0, 50),
+      keyword: (parsed.keyword ?? "").slice(0, 50),
       goodSectors: parsed.goodSectors ?? [],
       badSectors: parsed.badSectors ?? [],
     };

@@ -1,18 +1,18 @@
-import { createHash } from 'node:crypto';
-import { redis } from '../websocket';
-import type { NewsItem, NewsAnalysisResult } from './types';
+import { createHash } from "node:crypto";
+import { redis } from "../websocket";
+import type { NewsItem, NewsAnalysisResult } from "./types";
 
-const KEY_SEQ = 'news:seq';
-const KEY_TODAY = 'news:today';
-const KEY_ANALYSIS_TODAY = 'news:analysis:today';
-const STREAM_ANALYSIS = 'stream:news:analysis';
+const KEY_SEQ = "news:seq";
+const KEY_TODAY = "news:today";
+const KEY_ANALYSIS_TODAY = "news:analysis:today";
+const STREAM_ANALYSIS = "stream:news:analysis";
 
 export function todayKstYmd(now = new Date()): string {
   const kstMs = now.getTime() + 9 * 60 * 60 * 1000;
   const d = new Date(kstMs);
   const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(d.getUTCDate()).padStart(2, '0');
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
   return `${y}${m}${day}`;
 }
 
@@ -31,7 +31,7 @@ export function nextMidnightKstEpoch(now = new Date()): number {
 }
 
 export function urlHash(canonicalUrl: string): string {
-  return createHash('sha1').update(canonicalUrl).digest('hex');
+  return createHash("sha1").update(canonicalUrl).digest("hex");
 }
 
 export function dedupKey(ymd: string = todayKstYmd()): string {
@@ -134,18 +134,20 @@ export async function storeAnalysis(result: NewsAnalysisResult): Promise<void> {
     .exec();
 }
 
-export async function publishAnalysisEvent(result: NewsAnalysisResult): Promise<void> {
+export async function publishAnalysisEvent(
+  result: NewsAnalysisResult,
+): Promise<void> {
   await redis.xadd(
     STREAM_ANALYSIS,
-    'MAXLEN',
-    '~',
-    '1000',
-    '*',
-    'baseTime',
+    "MAXLEN",
+    "~",
+    "1000",
+    "*",
+    "baseTime",
     result.baseTime,
-    'newsCount',
+    "newsCount",
     String(result.newsCount),
-    'keyword',
+    "keyword",
     result.keyword,
   );
 }
