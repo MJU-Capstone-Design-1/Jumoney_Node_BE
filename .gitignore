@@ -5,4 +5,5 @@ dist
 .DS_Store
 coverage
 kis_api/
+docs/
 docker-compose.override.yml
