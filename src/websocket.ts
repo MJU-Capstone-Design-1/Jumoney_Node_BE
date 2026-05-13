@@ -72,7 +72,7 @@ export function parseKisTick(msg: string): Record<string, unknown> | null {
 /**
  * 시세 1건을 Redis 에 적재.
  *  - ZSET stock:history:{code} (30분 윈도우)
- *  - STRING stock:latest:{code}
+ *  - STRING stock:latest:{code} (TTL 3일, 매 틱마다 갱신)
  *  - Stream stream:stock:ticks (MAXLEN ~ 50000)
  *  - 그리고 SSE 구독자에게 broadcast.
  */
@@ -88,11 +88,12 @@ export async function recordToRedis(
   const dataString = JSON.stringify(dataWithTs);
 
   const thirtyMinutesAgo = timestamp - 30 * 60 * 1000;
+  const LATEST_TTL_SECONDS = 3 * 24 * 60 * 60;
 
   const pipeline = redis.multi();
   pipeline.zadd(historyKey, timestamp, dataString);
   pipeline.zremrangebyscore(historyKey, 0, thirtyMinutesAgo);
-  pipeline.set(latestKey, dataString);
+  pipeline.set(latestKey, dataString, "EX", LATEST_TTL_SECONDS);
   await pipeline.exec();
 
   await redis.xadd(
