@@ -15,7 +15,7 @@
 
 | 항목 | 값 |
 |------|----|
-| 쓰기 위치 | `src/websocket.ts:92` |
+| 쓰기 위치 | `src/websocket.ts:94` |
 | 명령어 | `ZADD` + `ZREMRANGEBYSCORE` |
 | 자료구조 | Sorted Set |
 | score | `timestamp` (ms epoch) |
@@ -54,18 +54,18 @@
 
 | 항목 | 값 |
 |------|----|
-| 쓰기 위치 | `src/websocket.ts:95` |
-| 명령어 | `SET` |
+| 쓰기 위치 | `src/websocket.ts:96` |
+| 명령어 | `SET ... EX` |
 | 자료구조 | String |
 | 값 | `stock:history:{code}`와 동일한 JSON 문자열 (최신 1건) |
-| TTL/보존 | 없음 (덮어쓰기) |
+| TTL/보존 | 3일 (`SET ... EX 259200`, 매 틱마다 갱신) |
 | 읽기 위치 | `src/app.ts:71` — SSE 초기 스냅샷 |
 
 ## stream:stock:ticks
 
 | 항목 | 값 |
 |------|----|
-| 쓰기 위치 | `src/websocket.ts:98` |
+| 쓰기 위치 | `src/websocket.ts:99` |
 | 명령어 | `XADD stream:stock:ticks MAXLEN ~ 300000 * ...` |
 | 자료구조 | Stream |
 | TTL/보존 | 약 300,000 entries (`MAXLEN ~` 근사 트리밍) |
@@ -189,9 +189,9 @@
 
 | 키 | 명령 | 자료구조 | TTL / 한도 | 쓰기 위치 |
 |----|------|----------|------------|-----------|
-| `stock:history:{code}` | ZADD | Sorted Set | 30분 슬라이딩 | `src/websocket.ts:92` |
-| `stock:latest:{code}` | SET | String | 없음 | `src/websocket.ts:95` |
-| `stream:stock:ticks` | XADD | Stream | ~300,000 entries | `src/websocket.ts:98` |
+| `stock:history:{code}` | ZADD | Sorted Set | 30분 슬라이딩 | `src/websocket.ts:94` |
+| `stock:latest:{code}` | SET ... EX | String | 3일 (매 틱 갱신) | `src/websocket.ts:96` |
+| `stream:stock:ticks` | XADD | Stream | ~300,000 entries | `src/websocket.ts:99` |
 | `news:dedup:{YYYYMMDD}` | SADD | Set | 자정 KST + 1h | `src/news/redis.ts:55` |
 | `news:seq` | INCR | String | 없음 | `src/news/redis.ts:63` |
 | `news:item:{newsId}` | HSET | Hash | 자정 KST | `src/news/redis.ts:71` |

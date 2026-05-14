@@ -1,6 +1,19 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { NewsItem, NewsAnalysisResult } from "./types";
 
+const ALLOWED_SECTORS = [
+  "IT/반도체",
+  "자동차/운송",
+  "금융",
+  "바이오/헬스케어",
+  "철강/소재",
+  "에너지/화학",
+  "커뮤니케이션",
+  "필수소비재",
+  "조선/기계",
+  "건설/유틸리티",
+] as const;
+
 const SYSTEM_PROMPT = `당신은 한국 주식시장 전문 애널리스트입니다.
 입력된 뉴스 목록을 분석하여 한국 증시 섹터에 미칠 영향을 평가하세요.
 반드시 아래 JSON 스키마를 따르는 단일 JSON 객체만 출력하세요. 다른 텍스트 금지.
@@ -10,11 +23,11 @@ const SYSTEM_PROMPT = `당신은 한국 주식시장 전문 애널리스트입�
   "summary": "30개 뉴스의 핵심 요약 (3-5줄)",
   "reasoning": "분석 근거 및 논리 (어떤 뉴스가 어떤 영향)",
   "keyword": "오늘의 핵심 키워드 한 단어 (최대 50자)",
-  "goodSectors": [{"sectorName": "반도체", "reason": "..."}],
-  "badSectors": [{"sectorName": "건설", "reason": "..."}]
+  "goodSectors": [{"sectorName": "IT/반도체", "reason": "..."}],
+  "badSectors": [{"sectorName": "건설/유틸리티", "reason": "..."}]
 }
 
-sectorName은 한국 KRX 표준 섹터명을 사용하세요 (예: 반도체, 자동차, 2차전지, 바이오, 금융, 건설, 화학, 철강, 에너지, 통신, 유통, IT서비스).`;
+sectorName은 반드시 다음 목록 중 하나만 사용하세요. 목록에 없는 섹터명은 절대 사용 금지: ${ALLOWED_SECTORS.join(", ")}.`;
 
 export class GeminiClient {
   private readonly client: GoogleGenerativeAI;
@@ -57,13 +70,20 @@ export class GeminiClient {
       badSectors?: Array<{ sectorName: string; reason?: string }>;
     };
 
+    const filterSectors = (
+      sectors?: Array<{ sectorName: string; reason?: string }>,
+    ) =>
+      (sectors ?? []).filter((s) =>
+        (ALLOWED_SECTORS as readonly string[]).includes(s.sectorName),
+      );
+
     return {
       analysisResult: parsed.analysisResult,
       summary: parsed.summary,
       reasoning: parsed.reasoning,
       keyword: (parsed.keyword ?? "").slice(0, 50),
-      goodSectors: parsed.goodSectors ?? [],
-      badSectors: parsed.badSectors ?? [],
+      goodSectors: filterSectors(parsed.goodSectors),
+      badSectors: filterSectors(parsed.badSectors),
     };
   }
 }
