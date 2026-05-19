@@ -147,12 +147,18 @@ app.get("/news/today", async (req: Request, res: Response) => {
       "Cache-Control",
       "public, max-age=300, stale-while-revalidate=600",
     );
-
+    const publicItems = items.map(({ newUrl, title, content, keyword }) => ({
+      newUrl,
+      title,
+      content,
+      keyword,
+    }));
     return res.json({
       baseTime,
-      count: items.length,
-      items,
+      count: publicItems.length,
+      items: publicItems,
     });
+
   } catch (e) {
     const err = e as Error;
     return res
