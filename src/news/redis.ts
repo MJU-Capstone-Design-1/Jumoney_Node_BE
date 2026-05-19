@@ -115,6 +115,50 @@ export async function getTodayNewsItems(limit = 30): Promise<NewsItem[]> {
   return items;
 }
 
+/**
+ * 가장 최근 분석(`news:analysis:today`)이 참조한 newsIds 기준으로 뉴스 본문을 모아 반환.
+ *  - 분석 결과와 1:1로 일치하는 "이번 시간의 30개"를 보장.
+ *  - 응답은 publishedAt 내림차순 (프론트가 최신순으로 보여줄 수 있도록).
+ */
+export async function getAnalysisNewsItems(): Promise<{
+  baseTime: string | null;
+  newsIds: number[];
+  items: NewsItem[];
+}> {
+  const analysis = await redis.hgetall(KEY_ANALYSIS_TODAY);
+  if (!analysis || !analysis.baseTime) {
+    return { baseTime: null, newsIds: [], items: [] };
+  }
+  const newsIds: number[] = analysis.newsIds
+    ? JSON.parse(analysis.newsIds)
+    : [];
+  if (newsIds.length === 0) {
+    return { baseTime: analysis.baseTime, newsIds: [], items: [] };
+  }
+
+  const pipeline = redis.multi();
+  for (const id of newsIds) pipeline.hgetall(itemKey(id));
+  const results = (await pipeline.exec()) ?? [];
+
+  const items: NewsItem[] = [];
+  for (const [err, raw] of results) {
+    if (err || !raw) continue;
+    const r = raw as Record<string, string>;
+    if (!r.newsId) continue;
+    items.push({
+      newsId: Number(r.newsId),
+      newUrl: r.newUrl,
+      title: r.title,
+      content: r.content,
+      publishedAt: Number(r.publishedAt),
+      keyword: r.keyword,
+      fetchedAt: Number(r.fetchedAt),
+    });
+  }
+  items.sort((a, b) => b.publishedAt - a.publishedAt);
+  return { baseTime: analysis.baseTime, newsIds, items };
+}
+
 export async function storeAnalysis(result: NewsAnalysisResult): Promise<void> {
   const expire = nextMidnightKstEpoch();
   await redis

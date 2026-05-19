@@ -5,6 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "dev:no-ws": "DISABLE_KIS_WS=true tsx watch src/index.ts",
     "build": "tsc",
     "prebuild": "rm -rf dist",
     "clean": "rm -rf dist",

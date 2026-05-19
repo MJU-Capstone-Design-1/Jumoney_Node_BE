@@ -149,4 +149,3 @@ docker compose up -d --build
 - 컨테이너 재시작 정책 `unless-stopped` — 호스트 재부팅/크래시 시 자동 복구
 - `restart: unless-stopped`는 프로세스 단위 재시작만 보장. KIS WebSocket 자체 끊김에 대한 reconnect 로직은 `src/websocket.ts`에 별도 추가 권장
 - 앱이 사용하는 환경변수 정의는 `.env.example` 참고
-
