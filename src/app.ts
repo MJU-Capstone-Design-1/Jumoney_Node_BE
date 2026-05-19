@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { redis, sseClients } from "./websocket";
 import { triggerNewsPipelineOnce } from "./news";
 import { getAnalysisNewsItems } from "./news/redis";
+import { ok, fail, CODE } from "./http/response";
 
 interface KISPriceResponse {
   output: {
@@ -109,17 +110,25 @@ app.get("/price/:code", async (req: Request, res: Response) => {
 
     const { stck_prpr, rprs_mrkt_kor_name, prdy_ctrt } = response.data.output;
 
-    res.json({
-      name: rprs_mrkt_kor_name,
-      price: parseInt(stck_prpr),
-      changeRate: parseFloat(prdy_ctrt),
-    });
+    res.json(
+      ok(CODE.STOCK.OK, "현재가 조회 성공", {
+        name: rprs_mrkt_kor_name,
+        price: parseInt(stck_prpr),
+        changeRate: parseFloat(prdy_ctrt),
+      }),
+    );
   } catch (error: unknown) {
     const err = error as { response?: { data?: unknown }; message?: string };
-    res.status(500).json({
-      message: "데이터 요청 실패",
-      error: err.response?.data ?? err.message ?? String(error),
-    });
+    // KIS raw payload(err.response.data)는 Spring 포맷에 자리가 없어 서버 로그로만 남김.
+    console.error("[stock] KIS price fetch failed:", err.response?.data ?? err.message);
+    res
+      .status(500)
+      .json(
+        fail(
+          CODE.STOCK.KIS_FAILED,
+          typeof err.message === "string" ? err.message : "KIS 데이터 요청 실패",
+        ),
+      );
   }
 });
 
@@ -135,7 +144,9 @@ app.get("/news/today", async (req: Request, res: Response) => {
     if (!baseTime) {
       return res
         .status(404)
-        .json({ message: "no analysis yet", items: [] });
+        .json(
+          fail(CODE.NEWS.NO_ANALYSIS, "아직 오늘 분석 결과가 없습니다."),
+        );
     }
 
     const etag = `"${createHash("sha1").update(baseTime).digest("hex")}"`;
@@ -153,17 +164,23 @@ app.get("/news/today", async (req: Request, res: Response) => {
       content,
       keyword,
     }));
-    return res.json({
-      baseTime,
-      count: publicItems.length,
-      items: publicItems,
-    });
-
+    return res.json(
+      ok(CODE.NEWS.OK, "오늘 뉴스 조회 성공", {
+        baseTime,
+        count: publicItems.length,
+        items: publicItems,
+      }),
+    );
   } catch (e) {
     const err = e as Error;
     return res
       .status(500)
-      .json({ message: "failed to load today news", error: err.message });
+      .json(
+        fail(
+          CODE.NEWS.LOAD_FAILED,
+          err.message ?? "오늘 뉴스 로드에 실패했습니다.",
+        ),
+      );
   }
 });
 
