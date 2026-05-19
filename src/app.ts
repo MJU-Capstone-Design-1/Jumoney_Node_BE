@@ -1,7 +1,9 @@
 import express, { Request, Response } from "express";
 import axios from "axios";
+import { createHash } from "node:crypto";
 import { redis, sseClients } from "./websocket";
 import { triggerNewsPipelineOnce } from "./news";
+import { getAnalysisNewsItems } from "./news/redis";
 
 interface KISPriceResponse {
   output: {
@@ -118,6 +120,44 @@ app.get("/price/:code", async (req: Request, res: Response) => {
       message: "데이터 요청 실패",
       error: err.response?.data ?? err.message ?? String(error),
     });
+  }
+});
+
+/**
+ * 오늘 분석 1건의 근거가 된 뉴스 30개 목록을 publishedAt 내림차순으로 반환.
+ *  - 분석이 아직 없으면 404 (자정 직후/콜드 스타트)
+ *  - ETag: baseTime 기반 → 분석이 새로 덮어쓰일 때만 변경
+ */
+app.get("/news/today", async (req: Request, res: Response) => {
+  try {
+    const { baseTime, items } = await getAnalysisNewsItems();
+
+    if (!baseTime) {
+      return res
+        .status(404)
+        .json({ message: "no analysis yet", items: [] });
+    }
+
+    const etag = `"${createHash("sha1").update(baseTime).digest("hex")}"`;
+    if (req.headers["if-none-match"] === etag) {
+      return res.status(304).end();
+    }
+    res.setHeader("ETag", etag);
+    res.setHeader(
+      "Cache-Control",
+      "public, max-age=300, stale-while-revalidate=600",
+    );
+
+    return res.json({
+      baseTime,
+      count: items.length,
+      items,
+    });
+  } catch (e) {
+    const err = e as Error;
+    return res
+      .status(500)
+      .json({ message: "failed to load today news", error: err.message });
   }
 });
 
