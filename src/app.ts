@@ -1,7 +1,10 @@
 import express, { Request, Response } from "express";
 import axios from "axios";
+import { createHash } from "node:crypto";
 import { redis, sseClients } from "./websocket";
 import { triggerNewsPipelineOnce } from "./news";
+import { getAnalysisNewsItems } from "./news/redis";
+import { ok, fail, CODE } from "./http/response";
 
 interface KISPriceResponse {
   output: {
@@ -107,17 +110,80 @@ app.get("/price/:code", async (req: Request, res: Response) => {
 
     const { stck_prpr, rprs_mrkt_kor_name, prdy_ctrt } = response.data.output;
 
-    res.json({
-      name: rprs_mrkt_kor_name,
-      price: parseInt(stck_prpr),
-      changeRate: parseFloat(prdy_ctrt),
-    });
+    res.json(
+      ok(CODE.STOCK.OK, "현재가 조회 성공", {
+        name: rprs_mrkt_kor_name,
+        price: parseInt(stck_prpr),
+        changeRate: parseFloat(prdy_ctrt),
+      }),
+    );
   } catch (error: unknown) {
     const err = error as { response?: { data?: unknown }; message?: string };
-    res.status(500).json({
-      message: "데이터 요청 실패",
-      error: err.response?.data ?? err.message ?? String(error),
-    });
+    // KIS raw payload(err.response.data)는 Spring 포맷에 자리가 없어 서버 로그로만 남김.
+    console.error(
+      "[stock] KIS price fetch failed:",
+      err.response?.data ?? err.message,
+    );
+    res
+      .status(500)
+      .json(
+        fail(
+          CODE.STOCK.KIS_FAILED,
+          typeof err.message === "string"
+            ? err.message
+            : "KIS 데이터 요청 실패",
+        ),
+      );
+  }
+});
+
+/**
+ * 오늘 분석 1건의 근거가 된 뉴스 30개 목록을 publishedAt 내림차순으로 반환.
+ *  - 분석이 아직 없으면 404 (자정 직후/콜드 스타트)
+ *  - ETag: baseTime 기반 → 분석이 새로 덮어쓰일 때만 변경
+ */
+app.get("/news/today", async (req: Request, res: Response) => {
+  try {
+    const { baseTime, items } = await getAnalysisNewsItems();
+
+    if (!baseTime) {
+      return res
+        .status(404)
+        .json(fail(CODE.NEWS.NO_ANALYSIS, "아직 오늘 분석 결과가 없습니다."));
+    }
+
+    const etag = `"${createHash("sha1").update(baseTime).digest("hex")}"`;
+    if (req.headers["if-none-match"] === etag) {
+      return res.status(304).end();
+    }
+    res.setHeader("ETag", etag);
+    res.setHeader(
+      "Cache-Control",
+      "public, max-age=300, stale-while-revalidate=600",
+    );
+    const publicItems = items.map(({ newUrl, title, content, keyword }) => ({
+      newUrl,
+      title,
+      content,
+      keyword,
+    }));
+    return res.json(
+      ok(CODE.NEWS.OK, "오늘 뉴스 조회 성공", {
+        baseTime,
+        count: publicItems.length,
+        items: publicItems,
+      }),
+    );
+  } catch (e) {
+    const err = e as Error;
+    return res
+      .status(500)
+      .json(
+        fail(
+          CODE.NEWS.LOAD_FAILED,
+          err.message ?? "오늘 뉴스 로드에 실패했습니다.",
+        ),
+      );
   }
 });
 

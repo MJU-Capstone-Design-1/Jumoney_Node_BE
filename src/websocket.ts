@@ -126,7 +126,10 @@ export async function recordToRedis(
 // kis/account.ts 와의 순환 의존을 안전하게 해소.
 import { startAllAccounts } from "./kis/manager";
 
-const kisHandle = startAllAccounts();
+const kisHandle =
+  process.env.DISABLE_KIS_WS === "true"
+    ? { stop: async () => undefined, accounts: [] }
+    : startAllAccounts();
 
 export async function stopAllKisAccounts(): Promise<void> {
   await kisHandle.stop();
