@@ -120,13 +120,18 @@ app.get("/price/:code", async (req: Request, res: Response) => {
   } catch (error: unknown) {
     const err = error as { response?: { data?: unknown }; message?: string };
     // KIS raw payload(err.response.data)는 Spring 포맷에 자리가 없어 서버 로그로만 남김.
-    console.error("[stock] KIS price fetch failed:", err.response?.data ?? err.message);
+    console.error(
+      "[stock] KIS price fetch failed:",
+      err.response?.data ?? err.message,
+    );
     res
       .status(500)
       .json(
         fail(
           CODE.STOCK.KIS_FAILED,
-          typeof err.message === "string" ? err.message : "KIS 데이터 요청 실패",
+          typeof err.message === "string"
+            ? err.message
+            : "KIS 데이터 요청 실패",
         ),
       );
   }
@@ -144,9 +149,7 @@ app.get("/news/today", async (req: Request, res: Response) => {
     if (!baseTime) {
       return res
         .status(404)
-        .json(
-          fail(CODE.NEWS.NO_ANALYSIS, "아직 오늘 분석 결과가 없습니다."),
-        );
+        .json(fail(CODE.NEWS.NO_ANALYSIS, "아직 오늘 분석 결과가 없습니다."));
     }
 
     const etag = `"${createHash("sha1").update(baseTime).digest("hex")}"`;

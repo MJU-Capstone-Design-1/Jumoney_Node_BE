@@ -13,11 +13,7 @@ export type ApiError = {
   message: string;
 };
 
-export function ok<T>(
-  code: string,
-  message: string,
-  data?: T,
-): ApiSuccess<T> {
+export function ok<T>(code: string, message: string, data?: T): ApiSuccess<T> {
   return data === undefined
     ? { success: true, code, message }
     : { success: true, code, message, data };
