@@ -162,6 +162,17 @@ export async function recordToRedis(
   broadcast(code, candle);
 }
 
+const SSE_PUSH_INTERVAL_MS = 5_000;
+
+setInterval(() => {
+  for (const [code, clients] of sseClients) {
+    if (!clients.size) continue;
+    const entry = currentCandles.get(code);
+    if (!entry) continue;
+    broadcast(code, entry.candle);
+  }
+}, SSE_PUSH_INTERVAL_MS);
+
 // 5계좌 매니저 기동 (모든 종목 항상 구독). 함수 정의가 모두 끝난 뒤 import 하여
 // kis/account.ts 와의 순환 의존을 안전하게 해소.
 import { startAllAccounts } from "./kis/manager";

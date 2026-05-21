@@ -9,3 +9,4 @@ docs/
 docker-compose.override.yml
 
 AGENTS.md
+.omc/
