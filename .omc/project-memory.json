@@ -1,0 +1,290 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1779374032695,
+  "projectRoot": "/Users/jungmin/Jumoney_project",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "tsconfig.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "express",
+        "version": "5.2.1",
+        "category": "backend"
+      },
+      {
+        "name": "vitest",
+        "version": "4.0.18",
+        "category": "testing"
+      }
+    ],
+    "packageManager": "pnpm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "pnpm build",
+    "testCommand": "pnpm test",
+    "lintCommand": "pnpm lint",
+    "devCommand": "pnpm dev",
+    "scripts": {
+      "dev": "tsx watch src/index.ts",
+      "dev:no-ws": "DISABLE_KIS_WS=true tsx watch src/index.ts",
+      "build": "tsc",
+      "prebuild": "rm -rf dist",
+      "clean": "rm -rf dist",
+      "start": "node dist/index.js",
+      "typecheck": "tsc --noEmit",
+      "lint": "eslint .",
+      "lint:fix": "eslint . --fix",
+      "test": "vitest run",
+      "test:watch": "vitest",
+      "format": "prettier --check .",
+      "format:write": "prettier --write ."
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": "ES modules",
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "docs",
+      "scripts",
+      "src"
+    ],
+    "gitBranches": {
+      "defaultBranch": "develop",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 2,
+      "lastAccessed": 1779374032684,
+      "keyFiles": [
+        "api-news.md",
+        "redis-schema.md"
+      ]
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 1,
+      "lastAccessed": 1779374032689,
+      "keyFiles": [
+        "deploy.sh"
+      ]
+    },
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 4,
+      "lastAccessed": 1779374032690,
+      "keyFiles": [
+        "app.ts",
+        "index.ts",
+        "websocket.ts"
+      ]
+    },
+    "~": {
+      "path": "~",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1779374032690,
+      "keyFiles": []
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "src/websocket.ts",
+      "accessCount": 8,
+      "lastAccessed": 1779377091322,
+      "type": "file"
+    },
+    {
+      "path": "package.json",
+      "accessCount": 5,
+      "lastAccessed": 1779375748965,
+      "type": "file"
+    },
+    {
+      "path": "src/app.ts",
+      "accessCount": 4,
+      "lastAccessed": 1779375749327,
+      "type": "file"
+    },
+    {
+      "path": "src/index.ts",
+      "accessCount": 4,
+      "lastAccessed": 1779375753772,
+      "type": "file"
+    },
+    {
+      "path": "src/kis/manager.ts",
+      "accessCount": 4,
+      "lastAccessed": 1779375754298,
+      "type": "file"
+    },
+    {
+      "path": "README.md",
+      "accessCount": 3,
+      "lastAccessed": 1779375601766,
+      "type": "file"
+    },
+    {
+      "path": "src/news/index.ts",
+      "accessCount": 3,
+      "lastAccessed": 1779375604885,
+      "type": "file"
+    },
+    {
+      "path": "src/http/response.ts",
+      "accessCount": 3,
+      "lastAccessed": 1779375749704,
+      "type": "file"
+    },
+    {
+      "path": "src/news/types.ts",
+      "accessCount": 3,
+      "lastAccessed": 1779375753935,
+      "type": "file"
+    },
+    {
+      "path": "docs/redis-schema.md",
+      "accessCount": 3,
+      "lastAccessed": 1779375985907,
+      "type": "file"
+    },
+    {
+      "path": "src/news/redis.ts",
+      "accessCount": 2,
+      "lastAccessed": 1779374152747,
+      "type": "file"
+    },
+    {
+      "path": "src/news/scheduler.ts",
+      "accessCount": 2,
+      "lastAccessed": 1779374152939,
+      "type": "file"
+    },
+    {
+      "path": "src/kis/account.ts",
+      "accessCount": 2,
+      "lastAccessed": 1779374156081,
+      "type": "file"
+    },
+    {
+      "path": "docs/api-news.md",
+      "accessCount": 2,
+      "lastAccessed": 1779374157197,
+      "type": "file"
+    },
+    {
+      "path": "src/kis/symbols.ts",
+      "accessCount": 2,
+      "lastAccessed": 1779374158322,
+      "type": "file"
+    },
+    {
+      "path": ".env.example",
+      "accessCount": 2,
+      "lastAccessed": 1779374160712,
+      "type": "file"
+    },
+    {
+      "path": "docker-compose.yml",
+      "accessCount": 2,
+      "lastAccessed": 1779374160846,
+      "type": "file"
+    },
+    {
+      "path": "src/news/naver.ts",
+      "accessCount": 2,
+      "lastAccessed": 1779374167318,
+      "type": "file"
+    },
+    {
+      "path": "src/news/gemini.ts",
+      "accessCount": 2,
+      "lastAccessed": 1779374167385,
+      "type": "file"
+    },
+    {
+      "path": "src/news/README.md",
+      "accessCount": 1,
+      "lastAccessed": 1779374157586,
+      "type": "file"
+    },
+    {
+      "path": "docs/제작보고서.md",
+      "accessCount": 1,
+      "lastAccessed": 1779374837634,
+      "type": "file"
+    },
+    {
+      "path": "AGENTS.md",
+      "accessCount": 1,
+      "lastAccessed": 1779375776145,
+      "type": "file"
+    },
+    {
+      "path": "src/AGENTS.md",
+      "accessCount": 1,
+      "lastAccessed": 1779375792661,
+      "type": "file"
+    },
+    {
+      "path": "docs/AGENTS.md",
+      "accessCount": 1,
+      "lastAccessed": 1779375804383,
+      "type": "file"
+    },
+    {
+      "path": "scripts/AGENTS.md",
+      "accessCount": 1,
+      "lastAccessed": 1779375809295,
+      "type": "file"
+    },
+    {
+      "path": "src/http/AGENTS.md",
+      "accessCount": 1,
+      "lastAccessed": 1779375824350,
+      "type": "file"
+    },
+    {
+      "path": "src/kis/AGENTS.md",
+      "accessCount": 1,
+      "lastAccessed": 1779375835900,
+      "type": "file"
+    },
+    {
+      "path": "src/news/AGENTS.md",
+      "accessCount": 1,
+      "lastAccessed": 1779375852117,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

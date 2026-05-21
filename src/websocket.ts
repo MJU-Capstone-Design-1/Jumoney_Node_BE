@@ -69,57 +69,97 @@ export function parseKisTick(msg: string): Record<string, unknown> | null {
   };
 }
 
+interface MinuteCandle {
+  code: string;
+  minuteTs: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  change: number;
+  rate: number;
+  strength: number;
+}
+
+// 종목코드 → 현재 분봉 상태 (인메모리 집계)
+const currentCandles = new Map<
+  string,
+  { candle: MinuteCandle; memberStr: string }
+>();
+
+// 종목코드 → 직전 누적거래량 (분봉 volume 델타 계산용)
+const lastCumVol = new Map<string, number>();
+
+const LATEST_TTL_SECONDS = 3 * 24 * 60 * 60;
+const CANDLE_WINDOW_MS = 40 * 60_000;
+const CANDLE_KEY_TTL_SECONDS = 60 * 60;
+
 /**
- * 시세 1건을 Redis 에 적재.
- *  - ZSET stock:history:{code} (30분 윈도우)
- *  - STRING stock:latest:{code} (TTL 3일, 매 틱마다 갱신)
- *  - Stream stream:stock:ticks (MAXLEN ~ 50000)
- *  - 그리고 SSE 구독자에게 broadcast.
+ * 틱 1건을 수신해 분봉(1분 OHLCV)으로 집계한 뒤 Redis에 적재.
+ *  - ZSET  stock:minute-candles:{code} (1일 윈도우, score = 분 시작 ms)
+ *  - STRING stock:latest:{code}        (TTL 3일, 현재 분봉 갱신마다 덮어씀)
+ *  - SSE 구독자에게 현재 분봉 broadcast.
  */
 export async function recordToRedis(
   parsedData: Record<string, unknown>,
 ): Promise<void> {
   const code = String(parsedData.code ?? "");
-  const historyKey = `stock:history:${code}`;
+  const price = Number(parsedData.price);
+  const change = Number(parsedData.change);
+  const rate = Number(parsedData.rate);
+  const vol = Number(parsedData.vol);
+  const strength = Number(parsedData.strength);
+
+  const now = Date.now();
+  const minuteTs = Math.floor(now / 60_000) * 60_000;
+
+  const prevCumVol = lastCumVol.get(code);
+  const tickVolDelta =
+    prevCumVol === undefined ? 0 : Math.max(0, vol - prevCumVol);
+  lastCumVol.set(code, vol);
+
+  const existing = currentCandles.get(code);
+  let candle: MinuteCandle;
+
+  if (existing && existing.candle.minuteTs === minuteTs) {
+    candle = existing.candle;
+    candle.high = Math.max(candle.high, price);
+    candle.low = Math.min(candle.low, price);
+    candle.close = price;
+    candle.volume += tickVolDelta;
+    candle.change = change;
+    candle.rate = rate;
+    candle.strength = strength;
+  } else {
+    candle = {
+      code,
+      minuteTs,
+      open: price,
+      high: price,
+      low: price,
+      close: price,
+      volume: tickVolDelta,
+      change,
+      rate,
+      strength,
+    };
+  }
+
+  const candleKey = `stock:minute-candles:${code}`;
   const latestKey = `stock:latest:${code}`;
-
-  const timestamp = Date.now();
-  const dataWithTs = { ...parsedData, timestamp };
-  const dataString = JSON.stringify(dataWithTs);
-
-  const thirtyMinutesAgo = timestamp - 30 * 60 * 1000;
-  const LATEST_TTL_SECONDS = 3 * 24 * 60 * 60;
+  const newMemberStr = JSON.stringify(candle);
 
   const pipeline = redis.multi();
-  pipeline.zadd(historyKey, timestamp, dataString);
-  pipeline.zremrangebyscore(historyKey, 0, thirtyMinutesAgo);
-  pipeline.set(latestKey, dataString, "EX", LATEST_TTL_SECONDS);
+  if (existing) pipeline.zrem(candleKey, existing.memberStr);
+  pipeline.zadd(candleKey, minuteTs, newMemberStr);
+  pipeline.zremrangebyscore(candleKey, 0, minuteTs - CANDLE_WINDOW_MS);
+  pipeline.expire(candleKey, CANDLE_KEY_TTL_SECONDS);
+  pipeline.set(latestKey, newMemberStr, "EX", LATEST_TTL_SECONDS);
   await pipeline.exec();
 
-  await redis.xadd(
-    "stream:stock:ticks",
-    "MAXLEN",
-    "~",
-    "300000",
-    "*",
-    "code",
-    code,
-    "price",
-    String(parsedData.price),
-    "change",
-    String(parsedData.change),
-    "rate",
-    String(parsedData.rate),
-    "vol",
-    String(parsedData.vol),
-    "strength",
-    String(parsedData.strength),
-    "time",
-    String(parsedData.time),
-    "timestamp",
-    String(timestamp),
-  );
-  broadcast(code, dataWithTs);
+  currentCandles.set(code, { candle, memberStr: newMemberStr });
+  broadcast(code, candle);
 }
 
 // 5계좌 매니저 기동 (모든 종목 항상 구독). 함수 정의가 모두 끝난 뒤 import 하여
