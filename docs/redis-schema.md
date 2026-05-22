@@ -9,44 +9,55 @@
 | Redis 클라이언트 | `ioredis` |
 | 키 네이밍 규칙 | `<도메인>:<용도>:<식별자>` (콜론 구분) |
 | TTL 기준 시각 | KST(UTC+9) 자정, `nextMidnightKstEpoch()` 헬퍼 |
-| 도메인 | 주식 실시간(`stock:*`, `stream:stock:*`), 뉴스(`news:*`, `stream:news:*`) |
+| 도메인 | 주식 실시간(`stock:*`), 뉴스(`news:*`, `stream:news:*`) |
 
-## stock:history:{code}
+## stock:minute-candles:{code}
 
 | 항목 | 값 |
 |------|----|
-| 쓰기 위치 | `src/websocket.ts:94` |
-| 명령어 | `ZADD` + `ZREMRANGEBYSCORE` |
+| 쓰기 위치 | `src/websocket.ts:149` (`recordToRedis`) |
+| 명령어 | `ZREM` + `ZADD` + `ZREMRANGEBYSCORE` + `EXPIRE` (pipeline) |
 | 자료구조 | Sorted Set |
-| score | `timestamp` (ms epoch) |
-| member | JSON 문자열 (아래 필드 표 참고) |
-| TTL/보존 | 최근 30분 슬라이딩 윈도우 |
+| score | `minuteTs` — 해당 분 시작 시각(ms), `floor(now / 60000) * 60000` |
+| member | 분봉 JSON 문자열 (아래 필드 표 참고) |
+| 슬라이딩 윈도우 | 최근 **40분** (`CANDLE_WINDOW_MS`) |
+| 키 TTL | **1시간** (`EXPIRE` 3600초) |
+
+집계 방식
+
+- KIS WebSocket 틱(`H0STCNT0`)을 **1분 OHLCV 분봉**으로 인메모리 집계 후 Redis에 적재
+- 동일 분(`minuteTs`) 내에서는 member를 `ZREM` 후 `ZADD`로 교체(OHLC·volume 갱신)
+- `volume`은 KIS 누적거래량(`vol`)의 **분 내 델타** (`lastCumVol`로 tick 간 차분)
 
 페이로드 필드
 
 | 필드 | 타입 | 설명 |
 |------|------|------|
 | code | string | 종목코드 |
-| time | string | 체결 시각 HHMMSS |
-| price | number | 현재가 |
+| minuteTs | number | 분 시작 ms epoch |
+| open | number | 시가(해당 분 첫 체결가) |
+| high | number | 고가 |
+| low | number | 저가 |
+| close | number | 종가(해당 분 최신 체결가) |
+| volume | number | 해당 분 체결량(델타 합) |
 | change | number | 전일대비 |
 | rate | number | 등락률 (%) |
-| vol | number | 누적 거래량 |
 | strength | number | 체결강도(CTTR) |
-| timestamp | number | ms epoch |
 
 예시
 
 ```json
 {
   "code": "005930",
-  "time": "153000",
-  "price": 71000,
+  "minuteTs": 1715511600000,
+  "open": 70900,
+  "high": 71100,
+  "low": 70850,
+  "close": 71000,
+  "volume": 12500,
   "change": 500,
   "rate": 0.71,
-  "vol": 12345678,
-  "strength": 105.3,
-  "timestamp": 1715511600000
+  "strength": 105.3
 }
 ```
 
@@ -54,34 +65,12 @@
 
 | 항목 | 값 |
 |------|----|
-| 쓰기 위치 | `src/websocket.ts:96` |
+| 쓰기 위치 | `src/websocket.ts:158` (동일 pipeline) |
 | 명령어 | `SET ... EX` |
 | 자료구조 | String |
-| 값 | `stock:history:{code}`와 동일한 JSON 문자열 (최신 1건) |
+| 값 | 현재 진행 중인 분봉 JSON (`stock:minute-candles:{code}` member와 동일 구조) |
 | TTL/보존 | 3일 (`SET ... EX 259200`, 매 틱마다 갱신) |
-| 읽기 위치 | `src/app.ts:71` — SSE 초기 스냅샷 |
-
-## stream:stock:ticks
-
-| 항목 | 값 |
-|------|----|
-| 쓰기 위치 | `src/websocket.ts:99` |
-| 명령어 | `XADD stream:stock:ticks MAXLEN ~ 300000 * ...` |
-| 자료구조 | Stream |
-| TTL/보존 | 약 300,000 entries (`MAXLEN ~` 근사 트리밍) |
-
-필드 (모두 문자열로 저장)
-
-| 필드 | 설명 |
-|------|------|
-| code | 종목코드 |
-| price | 현재가 |
-| change | 전일대비 |
-| rate | 등락률 |
-| vol | 누적 거래량 |
-| strength | 체결강도 |
-| time | HHMMSS |
-| timestamp | ms epoch |
+| 읽기 위치 | `src/app.ts:74` — SSE 연결 직후 초기 스냅샷 1회 |
 
 ## news:dedup:{YYYYMMDD}
 
@@ -189,9 +178,8 @@
 
 | 키 | 명령 | 자료구조 | TTL / 한도 | 쓰기 위치 |
 |----|------|----------|------------|-----------|
-| `stock:history:{code}` | ZADD | Sorted Set | 30분 슬라이딩 | `src/websocket.ts:94` |
-| `stock:latest:{code}` | SET ... EX | String | 3일 (매 틱 갱신) | `src/websocket.ts:96` |
-| `stream:stock:ticks` | XADD | Stream | ~300,000 entries | `src/websocket.ts:99` |
+| `stock:minute-candles:{code}` | ZREM+ZADD | Sorted Set | 40분 슬라이딩 / 키 TTL 1h | `src/websocket.ts:149` |
+| `stock:latest:{code}` | SET ... EX | String | 3일 (매 틱 갱신) | `src/websocket.ts:158` |
 | `news:dedup:{YYYYMMDD}` | SADD | Set | 자정 KST + 1h | `src/news/redis.ts:55` |
 | `news:seq` | INCR | String | 없음 | `src/news/redis.ts:63` |
 | `news:item:{newsId}` | HSET | Hash | 자정 KST | `src/news/redis.ts:71` |
