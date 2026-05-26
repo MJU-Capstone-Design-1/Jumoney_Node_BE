@@ -1,4 +1,4 @@
-import express, { Request, Response } from "express";
+import express, { Request, Response, Router } from "express";
 import axios from "axios";
 import { createHash } from "node:crypto";
 import { redis, sseClients } from "./websocket";
@@ -18,6 +18,7 @@ interface KISPriceResponse {
 }
 
 const app = express();
+const apiRouter = Router();
 
 let accessToken = "";
 
@@ -63,7 +64,7 @@ app.get("/health", (_req: Request, res: Response) => {
  * NOTE: 5계좌 매니저가 KOSPI 200 전 종목을 항상 구독하고 있으므로
  *       SSE 클라이언트 단위로 lazy subscribe 할 필요가 없다.
  */
-app.get("/stream/:code", async (req: Request, res: Response) => {
+apiRouter.get("/stream/:code", async (req: Request, res: Response) => {
   const code = req.params.code as string;
 
   res.setHeader("Content-Type", "text/event-stream");
@@ -85,7 +86,7 @@ app.get("/stream/:code", async (req: Request, res: Response) => {
 /**
  * 2. 현재가 조회 라우트
  */
-app.get("/price/:code", async (req: Request, res: Response) => {
+apiRouter.get("/price/:code", async (req: Request, res: Response) => {
   const stockCode = req.params.code;
 
   if (!accessToken) await getAccessToken();
@@ -142,7 +143,7 @@ app.get("/price/:code", async (req: Request, res: Response) => {
  *  - 분석이 아직 없으면 404 (자정 직후/콜드 스타트)
  *  - ETag: baseTime 기반 → 분석이 새로 덮어쓰일 때만 변경
  */
-app.get("/news/today", async (req: Request, res: Response) => {
+apiRouter.get("/news/today", async (req: Request, res: Response) => {
   try {
     const { baseTime, items } = await getAnalysisNewsItems();
 
@@ -187,7 +188,7 @@ app.get("/news/today", async (req: Request, res: Response) => {
   }
 });
 
-app.post("/admin/news/run", async (req: Request, res: Response) => {
+apiRouter.post("/admin/news/run", async (req: Request, res: Response) => {
   if (
     process.env.NODE_ENV === "production" &&
     req.headers["x-admin-token"] !== process.env.ADMIN_TOKEN
@@ -205,5 +206,7 @@ app.post("/admin/news/run", async (req: Request, res: Response) => {
       .json({ message: "news pipeline failed", error: err.message });
   }
 });
+
+app.use("/api", apiRouter);
 
 export default app;
