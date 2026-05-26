@@ -151,7 +151,8 @@ export async function recordToRedis(
   const newMemberStr = JSON.stringify(candle);
 
   const pipeline = redis.multi();
-  if (existing && existing.candle.minuteTs === minuteTs) pipeline.zrem(candleKey, existing.memberStr);
+  if (existing && existing.candle.minuteTs === minuteTs)
+    pipeline.zrem(candleKey, existing.memberStr);
   pipeline.zadd(candleKey, minuteTs, newMemberStr);
   pipeline.zremrangebyscore(candleKey, 0, minuteTs - CANDLE_WINDOW_MS);
   pipeline.expire(candleKey, CANDLE_KEY_TTL_SECONDS);
