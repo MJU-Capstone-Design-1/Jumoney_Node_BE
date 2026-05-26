@@ -41,19 +41,21 @@ export function parseKisTick(msg: string): Record<string, unknown> | null {
   const parts = msg.split("|");
   if (parts.length < 4 || !parts[3]) return null;
   const body = parts[3].split("^");
-  if (body.length < 18) return null;
+  if (body.length < 19) return null;
 
   const price = parseInt(body[2], 10);
   const change = parseInt(body[4], 10);
   const rate = parseFloat(body[5]);
   const vol = parseInt(body[12], 10);
-  const strength = parseFloat(body[17]);
+  const tradeAmt = parseInt(body[14], 10);
+  const strength = parseFloat(body[18]);
 
   if (
     isNaN(price) ||
     isNaN(change) ||
     isNaN(rate) ||
     isNaN(vol) ||
+    isNaN(tradeAmt) ||
     isNaN(strength)
   )
     return null;
@@ -65,6 +67,7 @@ export function parseKisTick(msg: string): Record<string, unknown> | null {
     change, // 전일대비
     rate, // 등락률
     vol, // 누적거래량
+    tradeAmt, // 누적거래대금 (ACML_TR_PBMN)
     strength, // 체결강도 (CTTR)
   };
 }
@@ -77,6 +80,7 @@ interface MinuteCandle {
   low: number;
   close: number;
   volume: number;
+  tradeAmount: number;
   change: number;
   rate: number;
   strength: number;
@@ -90,6 +94,9 @@ const currentCandles = new Map<
 
 // 종목코드 → 직전 누적거래량 (분봉 volume 델타 계산용)
 const lastCumVol = new Map<string, number>();
+
+// 종목코드 → 직전 누적거래대금 (분봉 tradeAmount 델타 계산용)
+const lastCumTradeAmt = new Map<string, number>();
 
 const LATEST_TTL_SECONDS = 3 * 24 * 60 * 60;
 const CANDLE_WINDOW_MS = 40 * 60_000;
@@ -109,6 +116,7 @@ export async function recordToRedis(
   const change = Number(parsedData.change);
   const rate = Number(parsedData.rate);
   const vol = Number(parsedData.vol);
+  const tradeAmt = Number(parsedData.tradeAmt);
   const strength = Number(parsedData.strength);
 
   const now = Date.now();
@@ -119,6 +127,11 @@ export async function recordToRedis(
     prevCumVol === undefined ? 0 : Math.max(0, vol - prevCumVol);
   lastCumVol.set(code, vol);
 
+  const prevCumTradeAmt = lastCumTradeAmt.get(code);
+  const tickTradeAmtDelta =
+    prevCumTradeAmt === undefined ? 0 : Math.max(0, tradeAmt - prevCumTradeAmt);
+  lastCumTradeAmt.set(code, tradeAmt);
+
   const existing = currentCandles.get(code);
   let candle: MinuteCandle;
 
@@ -128,6 +141,7 @@ export async function recordToRedis(
     candle.low = Math.min(candle.low, price);
     candle.close = price;
     candle.volume += tickVolDelta;
+    candle.tradeAmount += tickTradeAmtDelta;
     candle.change = change;
     candle.rate = rate;
     candle.strength = strength;
@@ -140,6 +154,7 @@ export async function recordToRedis(
       low: price,
       close: price,
       volume: tickVolDelta,
+      tradeAmount: tickTradeAmtDelta,
       change,
       rate,
       strength,
@@ -163,7 +178,7 @@ export async function recordToRedis(
   broadcast(code, candle);
 }
 
-const SSE_PUSH_INTERVAL_MS = 5_000;
+const SSE_PUSH_INTERVAL_MS = 1_000;
 
 setInterval(() => {
   for (const [code, clients] of sseClients) {
