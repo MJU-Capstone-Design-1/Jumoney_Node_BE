@@ -1,4 +1,5 @@
 import express, { Request, Response, Router } from "express";
+import cors from "cors";
 import axios from "axios";
 import { createHash } from "node:crypto";
 import { redis, sseClients } from "./websocket";
@@ -206,6 +207,13 @@ apiRouter.post("/admin/news/run", async (req: Request, res: Response) => {
       .json({ message: "news pipeline failed", error: err.message });
   }
 });
+
+app.use(
+  cors({
+    origin: process.env.CORS_ORIGIN ?? true,
+    credentials: true,
+  }),
+);
 
 app.use("/api", apiRouter);
 
