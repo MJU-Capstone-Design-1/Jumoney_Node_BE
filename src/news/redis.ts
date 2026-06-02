@@ -92,7 +92,7 @@ export async function hasAnalysisToday(): Promise<boolean> {
 }
 
 export async function getTodayNewsItems(limit = 30): Promise<NewsItem[]> {
-  const ids = await redis.zrange(KEY_TODAY, 0, limit - 1);
+  const ids = await redis.zrevrange(KEY_TODAY, 0, limit - 1);
   if (ids.length === 0) return [];
   const pipeline = redis.multi();
   for (const id of ids) pipeline.hgetall(itemKey(Number(id)));
