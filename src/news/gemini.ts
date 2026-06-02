@@ -41,6 +41,24 @@ export class GeminiClient {
     this.modelName = GEMINI_MODEL ?? "gemini-2.5-pro";
   }
 
+  async filterRelevant(titles: string[]): Promise<number[]> {
+    const model = this.client.getGenerativeModel({
+      model: this.modelName,
+      generationConfig: { responseMimeType: "application/json" },
+    });
+
+    const prompt = `다음 뉴스 제목 목록 중 한국 주식시장(코스피/코스닥)과 직접 관련된 것의 인덱스 배열만 JSON으로 반환하세요.
+운세, 별자리, 사주, 타로, 로또, 복권, 연예, 날씨, 스포츠 등 주식과 무관한 기사는 제외합니다.
+출력 형식: {"relevant": [0, 2, 3, ...]}
+
+뉴스 목록:
+${titles.map((t, i) => `[${i}] ${t}`).join("\n")}`;
+
+    const result = await model.generateContent(prompt);
+    const parsed = JSON.parse(result.response.text()) as { relevant: number[] };
+    return parsed.relevant ?? [];
+  }
+
   async analyze(
     items: NewsItem[],
   ): Promise<Omit<NewsAnalysisResult, "baseTime" | "newsCount" | "newsIds">> {
