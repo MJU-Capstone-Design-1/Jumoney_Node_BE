@@ -55,9 +55,14 @@ async function collectOnce(): Promise<number> {
       relevantIndices = await gemini.filterRelevant(rawTitles);
       const filtered = items.length - relevantIndices.length;
       if (filtered > 0)
-        console.log(`[news:filter] "${keyword}": ${filtered}개 제외 (${relevantIndices.length}개 관련)`);
+        console.log(
+          `[news:filter] "${keyword}": ${filtered}개 제외 (${relevantIndices.length}개 관련)`,
+        );
     } catch (e) {
-      console.error(`[news:filter] gemini filter failed for "${keyword}", storing all:`, e);
+      console.error(
+        `[news:filter] gemini filter failed for "${keyword}", storing all:`,
+        e,
+      );
       relevantIndices = items.map((_, i) => i);
     }
     const relevantItems = items.filter((_, i) => relevantIndices.includes(i));
