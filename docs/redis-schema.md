@@ -27,7 +27,8 @@
 
 - KIS WebSocket 틱(`H0STCNT0`)을 **1분 OHLCV 분봉**으로 인메모리 집계 후 Redis에 적재
 - 동일 분(`minuteTs`) 내에서는 member를 `ZREM` 후 `ZADD`로 교체(OHLC·volume 갱신)
-- `volume`은 KIS 누적거래량(`vol`)의 **분 내 델타** (`lastCumVol`로 tick 간 차분)
+- `volume`은 KIS 누적거래량(`ACML_VOL`, body[13])의 **분 내 델타** (`lastCumVol`로 tick 간 차분)
+- `tradeAmount`는 KIS 누적거래대금(`ACML_TR_PBMN`, body[14])의 **분 내 델타** (`lastCumTradeAmt`로 tick 간 차분)
 
 페이로드 필드
 
@@ -40,6 +41,7 @@
 | low | number | 저가 |
 | close | number | 종가(해당 분 최신 체결가) |
 | volume | number | 해당 분 체결량(델타 합) |
+| tradeAmount | number | 해당 분 거래대금(델타 합, 원 단위) |
 | change | number | 전일대비 |
 | rate | number | 등락률 (%) |
 | strength | number | 체결강도(CTTR) |
@@ -55,6 +57,7 @@
   "low": 70850,
   "close": 71000,
   "volume": 12500,
+  "tradeAmount": 8875000000,
   "change": 500,
   "rate": 0.71,
   "strength": 105.3
