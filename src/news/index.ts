@@ -35,7 +35,7 @@ function parseKeywords(): string[] {
 }
 
 async function collectOnce(): Promise<number> {
-  const { naver, gemini } = getClients();
+  const { naver } = getClients();
   const keywords = parseKeywords();
   const display = Number(process.env.NEWS_DISPLAY_PER_KEYWORD ?? 10);
   let inserted = 0;
@@ -49,25 +49,7 @@ async function collectOnce(): Promise<number> {
       continue;
     }
 
-    const rawTitles = items.map((raw) => stripHtml(raw.title));
-    let relevantIndices: number[];
-    try {
-      relevantIndices = await gemini.filterRelevant(rawTitles);
-      const filtered = items.length - relevantIndices.length;
-      if (filtered > 0)
-        console.log(
-          `[news:filter] "${keyword}": ${filtered}개 제외 (${relevantIndices.length}개 관련)`,
-        );
-    } catch (e) {
-      console.error(
-        `[news:filter] gemini filter failed for "${keyword}", storing all:`,
-        e,
-      );
-      relevantIndices = items.map((_, i) => i);
-    }
-    const relevantItems = items.filter((_, i) => relevantIndices.includes(i));
-
-    for (const raw of relevantItems) {
+    for (const raw of items) {
       const url = raw.originallink || raw.link;
       if (!url) continue;
       const canonical = canonicalizeUrl(url);
