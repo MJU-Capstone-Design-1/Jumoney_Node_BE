@@ -78,7 +78,7 @@ export class GeminiClient {
 뉴스 목록:
 ${titles.map((t, i) => `[${i}] ${t}`).join("\n")}`;
 
-    const result = await model.generateContent(prompt);
+    const result = await this.withRetry(() => model.generateContent(prompt));
     const parsed = JSON.parse(result.response.text()) as { relevant: number[] };
     return parsed.relevant ?? [];
   }
