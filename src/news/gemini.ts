@@ -34,12 +34,35 @@ export class GeminiClient {
   private readonly client: GoogleGenerativeAI;
   private readonly modelName: string;
 
+  private async withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await fn();
+      } catch (e: unknown) {
+        const isRateLimit = e instanceof Error && e.message.includes("429");
+        if (!isRateLimit) throw e;
+        if (attempt === maxRetries) {
+          console.error(
+            "[gemini] 429 최대 재시도 초과 — 일일 할당량 소진 가능성. API 키 확인 필요",
+          );
+          throw e;
+        }
+        const delay = Math.pow(2, attempt) * 10_000;
+        console.warn(
+          `[gemini] 429 rate-limit, retry ${attempt + 1}/${maxRetries} in ${delay / 1000}s`,
+        );
+        await new Promise((r) => setTimeout(r, delay));
+      }
+    }
+    throw new Error("unreachable");
+  }
+
   constructor() {
     const { GEMINI_API_KEY, GEMINI_MODEL } = process.env;
     if (!GEMINI_API_KEY)
       throw new Error("GEMINI_API_KEY 환경변수가 필요합니다.");
     this.client = new GoogleGenerativeAI(GEMINI_API_KEY);
-    this.modelName = GEMINI_MODEL ?? "gemini-2.5-pro";
+    this.modelName = GEMINI_MODEL ?? "gemini-2.5-flash";
   }
 
   async filterRelevant(titles: string[]): Promise<number[]> {
@@ -77,7 +100,7 @@ ${titles.map((t, i) => `[${i}] ${t}`).join("\n")}`;
 
     const prompt = `${SYSTEM_PROMPT}\n\n=== 분석 대상 뉴스 (${items.length}개) ===\n${newsBlock}`;
 
-    const result = await model.generateContent(prompt);
+    const result = await this.withRetry(() => model.generateContent(prompt));
     const text = result.response.text();
 
     const parsed = JSON.parse(text) as {
