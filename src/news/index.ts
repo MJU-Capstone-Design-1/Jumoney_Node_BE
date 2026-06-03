@@ -85,9 +85,24 @@ async function maybeAnalyze(_force = false): Promise<boolean> {
   const { gemini } = getClients();
   const items = await getTodayNewsItems(target);
 
+  let filteredItems = items;
+  try {
+    const titles = items.map((i) => i.title);
+    const relevantIndices = await gemini.filterRelevant(titles);
+    filteredItems = relevantIndices.map((idx) => items[idx]).filter(Boolean);
+    console.log(`[news] filter: ${items.length} → ${filteredItems.length}개`);
+  } catch (e) {
+    console.warn("[news] filterRelevant failed, using all items:", e);
+  }
+
+  if (filteredItems.length === 0) {
+    console.log("[news] no relevant items after filtering");
+    return false;
+  }
+
   let analysis;
   try {
-    analysis = await gemini.analyze(items);
+    analysis = await gemini.analyze(filteredItems);
   } catch (e) {
     console.error("[news] gemini analyze failed:", e);
     return false;
