@@ -184,8 +184,13 @@ setInterval(() => {
   for (const [code, clients] of sseClients) {
     if (!clients.size) continue;
     const entry = currentCandles.get(code);
-    if (!entry) continue;
-    broadcast(code, entry.candle);
+    if (entry) {
+      broadcast(code, entry.candle);
+    } else {
+      void redis.get(`stock:latest:${code}`).then((cached) => {
+        if (cached) broadcast(code, JSON.parse(cached));
+      });
+    }
   }
 }, SSE_PUSH_INTERVAL_MS);
 

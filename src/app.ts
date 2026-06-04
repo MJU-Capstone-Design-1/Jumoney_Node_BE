@@ -71,6 +71,9 @@ apiRouter.get("/stream/:code", async (req: Request, res: Response) => {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.socket?.setNoDelay(true);
+  res.flushHeaders();
 
   // 캐시된 최신값 즉시 전송 (장 외 시간 또는 첫 접속 시 초기값 제공)
   const cached = await redis.get(`stock:latest:${code}`);
